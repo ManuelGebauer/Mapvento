@@ -4,10 +4,12 @@ import { abortPlaces } from '../src/features/osm-places/placesDiagnostics'
 
 describe('OSM places provider', () => {
   afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals() })
-  it('combines only selected categories within the requested bounds', () => {
-    const query = buildPlacesQuery({ south: 50, west: 8, north: 51, east: 9 }, ['water', 'food'])
+  it('queries only the selected types within the requested bounds', () => {
+    const query = buildPlacesQuery({ south: 50, west: 8, north: 51, east: 9 }, ['spring', 'supermarket'])
     expect(query).toContain('nwr["natural"="spring"](50,8,51,9)')
     expect(query).toContain('nwr["shop"="supermarket"](50,8,51,9)')
+    expect(query).not.toContain('drinking_water')
+    expect(query).not.toContain('restaurant')
     expect(query).not.toContain('nwr["amenity"="parking"]')
     expect(() => buildPlacesQuery({ south: 50, west: 8, north: 51, east: 9 }, [])).toThrow()
   })
@@ -17,12 +19,14 @@ describe('OSM places provider', () => {
       { type: 'node', id: 1, lat: 50, lon: 8, tags: { natural: 'spring', name: 'Quelle', access: 'yes' } },
       { type: 'way', id: 1, center: { lat: 50.1, lon: 8.1 }, tags: { tourism: 'museum' } },
       { type: 'node', id: 2, lat: 50, lon: 8, tags: { amenity: 'parking', access: 'private' } },
+      { type: 'node', id: 3, lat: 50, lon: 8, tags: { amenity: 'restaurant', access: 'customers' } },
+      { type: 'node', id: 4, lat: 50, lon: 8, tags: { amenity: 'restaurant', access: '  Customers  ' } },
     ] })
-    expect(places).toHaveLength(2)
+    expect(places.map((place) => place.id)).toEqual([1, 1, 3, 4])
     expect(places[0].tags.name).toBe('Quelle')
     expect(places[1]).toMatchObject({ type: 'way', id: 1, latitude: 50.1, longitude: 8.1 })
-    expect(placeKind(places[1], ['info'])?.icon).toBe('museum')
-    expect(placeKind(places[1], ['water'])).toBeUndefined()
+    expect(placeKind(places[1], ['museum'])?.icon).toBe('museum')
+    expect(placeKind(places[1], ['spring'])).toBeUndefined()
   })
 
   it('rejects incomplete or invalid responses rather than caching them as complete', () => {
@@ -35,7 +39,7 @@ describe('OSM places provider', () => {
     const fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify({ elements: [] }), { status: 200 }))
     vi.stubGlobal('fetch', fetch)
     const signal = new AbortController().signal
-    await expect(fetchPlaces({ south: 50, west: 8, north: 51, east: 9 }, ['water'], signal)).resolves.toEqual([])
+    await expect(fetchPlaces({ south: 50, west: 8, north: 51, east: 9 }, ['spring'], signal)).resolves.toEqual([])
     expect(fetch.mock.calls[0][1]).toMatchObject({ method: 'POST', signal })
   })
 
@@ -48,10 +52,10 @@ describe('OSM places provider', () => {
     vi.stubGlobal('fetch', fetch)
     const bounds = { south: 50, west: 8, north: 51, east: 9 }
     const signal = new AbortController().signal
-    await expect(fetchPlaces(bounds, ['water'], signal)).rejects.toMatchObject<Partial<OverpassHttpError>>({ status: 429, retryAfterMs: 45_000 })
-    await expect(fetchPlaces(bounds, ['water'], signal)).rejects.toThrow('Zeitlimit des Servers')
-    await expect(fetchPlaces(bounds, ['water'], signal)).rejects.toBeInstanceOf(OverpassSizeError)
-    await expect(fetchPlaces(bounds, ['water'], signal)).rejects.toThrow('unvollständige Antwort')
+    await expect(fetchPlaces(bounds, ['spring'], signal)).rejects.toMatchObject<Partial<OverpassHttpError>>({ status: 429, retryAfterMs: 45_000 })
+    await expect(fetchPlaces(bounds, ['spring'], signal)).rejects.toThrow('Zeitlimit des Servers')
+    await expect(fetchPlaces(bounds, ['spring'], signal)).rejects.toBeInstanceOf(OverpassSizeError)
+    await expect(fetchPlaces(bounds, ['spring'], signal)).rejects.toThrow('unvollständige Antwort')
   })
 
   it('records HTTP errors and distinguishes timeouts from requests without an HTTP response', async () => {
@@ -64,10 +68,10 @@ describe('OSM places provider', () => {
       }))
     vi.stubGlobal('fetch', fetch)
     const bounds = { south: 50, west: 8, north: 51, east: 9 }
-    await expect(fetchPlaces(bounds, ['water'], new AbortController().signal, diagnostic)).rejects.toBeInstanceOf(OverpassHttpError)
-    await expect(fetchPlaces(bounds, ['water'], new AbortController().signal, diagnostic)).rejects.toThrow('Netzwerk- oder CORS-Fehler')
+    await expect(fetchPlaces(bounds, ['spring'], new AbortController().signal, diagnostic)).rejects.toBeInstanceOf(OverpassHttpError)
+    await expect(fetchPlaces(bounds, ['spring'], new AbortController().signal, diagnostic)).rejects.toThrow('Netzwerk- oder CORS-Fehler')
     const controller = new AbortController()
-    const pending = fetchPlaces(bounds, ['water'], controller.signal, diagnostic)
+    const pending = fetchPlaces(bounds, ['spring'], controller.signal, diagnostic)
     controller.abort(new DOMException('timeout', 'TimeoutError'))
     await expect(pending).rejects.toBeDefined()
     expect(diagnostic.mock.calls.map(([event]) => [event.outcome, event.httpStatus])).toEqual([
@@ -90,7 +94,7 @@ describe('OSM places provider', () => {
     const events = vi.fn()
     const bounds = { south: 50, west: 8, north: 51, east: 9 }
     for (let i = 0; i < 6; i++) {
-      await expect(fetchPlaces(bounds, ['water'], new AbortController().signal, events)).rejects.toBeDefined()
+      await expect(fetchPlaces(bounds, ['spring'], new AbortController().signal, events)).rejects.toBeDefined()
     }
     expect(events.mock.calls.map(([event]) => [event.outcome, event.phase, event.detail])).toEqual([
       ['http-error', 'body', 'server-busy'],
@@ -110,12 +114,12 @@ describe('OSM places provider', () => {
     const events = vi.fn()
     const bounds = { south: 50, west: 8, north: 51, east: 9 }
     const controller = new AbortController()
-    const pending = fetchPlaces(bounds, ['water'], controller.signal, events)
+    const pending = fetchPlaces(bounds, ['spring'], controller.signal, events)
     abortPlaces(controller, 'map-movement')
     await expect(pending).rejects.toBeDefined()
     expect(events).toHaveBeenLastCalledWith(expect.objectContaining({ outcome: 'aborted', abortReason: 'map-movement' }))
     const other = new AbortController()
-    const otherPending = fetchPlaces(bounds, ['water'], other.signal, events)
+    const otherPending = fetchPlaces(bounds, ['spring'], other.signal, events)
     other.abort(new DOMException('secret-key', 'AbortError'))
     await expect(otherPending).rejects.toBeDefined()
     expect(events).toHaveBeenLastCalledWith(expect.objectContaining({ outcome: 'aborted', abortReason: 'unknown' }))
@@ -129,13 +133,13 @@ describe('OSM places provider', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(response).mockResolvedValueOnce(new Response('secret', { status: 503 })))
     const events = vi.fn()
     const bounds = { south: 50, west: 8, north: 51, east: 9 }
-    const pending = fetchPlaces(bounds, ['water'], new AbortController().signal, events)
+    const pending = fetchPlaces(bounds, ['spring'], new AbortController().signal, events)
     const rejected = expect(pending).rejects.toBeInstanceOf(OverpassHttpError)
     await vi.advanceTimersByTimeAsync(1001)
     await rejected
     expect(events).toHaveBeenLastCalledWith(expect.objectContaining({ outcome: 'http-error', detail: 'body-unavailable' }))
     expect(cancel).toHaveBeenCalled()
-    await expect(fetchPlaces(bounds, ['water'], new AbortController().signal, events, () => false))
+    await expect(fetchPlaces(bounds, ['spring'], new AbortController().signal, events, () => false))
       .rejects.toBeInstanceOf(OverpassHttpError)
     expect(events).toHaveBeenLastCalledWith(expect.objectContaining({ phase: 'request', detail: null }))
   })
@@ -145,7 +149,7 @@ describe('OSM places provider', () => {
     const reader = response.body!.getReader()
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response))
     const events = vi.fn()
-    await expect(fetchPlaces({ south: 50, west: 8, north: 51, east: 9 }, ['water'],
+    await expect(fetchPlaces({ south: 50, west: 8, north: 51, east: 9 }, ['spring'],
       new AbortController().signal, events)).rejects.toMatchObject({ status: 503 })
     expect(events).toHaveBeenCalledWith(expect.objectContaining({ outcome: 'http-error', detail: 'body-unavailable' }))
     reader.releaseLock()

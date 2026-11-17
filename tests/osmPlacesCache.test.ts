@@ -1,6 +1,7 @@
 import { indexedDB } from 'fake-indexeddb'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { isPlacesEntryFresh, PLACES_MAX_AGE, PlacesCache } from '../src/features/osm-places/placesCache'
+import { cellForPosition, cellKey, legacyCellKey } from '../src/features/osm-places/placeCells'
 
 let database = 0
 
@@ -14,16 +15,39 @@ describe('OSM places cache', () => {
     const entries = [
       { key: 'cell:water', downloadedAt: 1000, places: [] },
       { key: 'cell:food', downloadedAt: 1000, places: [{
-        type: 'node' as const, id: 5, latitude: 50, longitude: 8, tags: { amenity: 'restaurant' },
+        type: 'node' as const, id: 5, latitude: 50, longitude: 8, tags: { amenity: 'restaurant', access: 'customers' },
       }] },
     ]
     await first.put(entries)
     const restored = await new PlacesCache(name).get(entries.map((entry) => entry.key))
     expect(restored.get('cell:water')?.places).toEqual([])
     expect(restored.get('cell:food')?.places[0].id).toBe(5)
+    expect(restored.get('cell:food')?.places[0].tags.access).toBe('customers')
     expect(isPlacesEntryFresh(entries[0], 1000 + PLACES_MAX_AGE - 1)).toBe(true)
     expect(isPlacesEntryFresh(entries[0], 1000 + PLACES_MAX_AGE)).toBe(false)
     expect(isPlacesEntryFresh(entries[0], 999)).toBe(false)
+  })
+
+  it('finds cached places over a large visible area and prefers complete entries over legacy data', async () => {
+    const cache = new PlacesCache(`places-${database++}`)
+    const west = cellForPosition(50, -179.9)
+    const east = cellForPosition(50, 179.9)
+    const outside = cellForPosition(50, 8)
+    const spring = (id: number, longitude: number) => ({
+      type: 'node' as const, id, latitude: 50, longitude, tags: { natural: 'spring' },
+    })
+    await cache.put([
+      { key: legacyCellKey(west, 'water'), downloadedAt: 20, places: [spring(1, -179.9)] },
+      { key: cellKey(west, 'spring'), downloadedAt: 10, places: [] },
+      { key: legacyCellKey(east, 'water'), downloadedAt: 20, places: [spring(2, 179.9)] },
+      { key: cellKey(outside, 'spring'), downloadedAt: 20, places: [spring(3, 8)] },
+    ])
+    const entries = await cache.getVisible({ south: 40, north: 60, west: 179, east: 181 }, ['spring'])
+    expect(entries.size).toBe(2)
+    expect(entries.get(cellKey(west, 'spring'))?.places).toEqual([])
+    expect(entries.get(cellKey(east, 'spring'))?.places.map((place) => place.id)).toEqual([2])
+    expect(entries.has(cellKey(outside, 'spring'))).toBe(false)
+    expect((await cache.getVisible({ south: -90, north: 90, west: -360, east: 360 }, ['spring'])).size).toBe(3)
   })
 
   it('retains previous data when a replacement exceeds the storage limit', async () => {

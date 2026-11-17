@@ -1,5 +1,5 @@
-import { batchesForCells, cellForPosition, cellKey, type PlaceCell } from './placeCells'
-import { fetchPlaces, OverpassHttpError, OverpassInvalidResponseError, OverpassNetworkError, OverpassSizeError, OverpassUnavailableError, placeKind, type Bounds, type Place, type PlaceCategory, type PlacesDiagnostic } from './places'
+import { batchesForCells, cellForPosition, cellKey, legacyCellKey, legacyKindCellKey, type PlaceCell } from './placeCells'
+import { PLACE_KINDS, fetchPlaces, OverpassHttpError, OverpassInvalidResponseError, OverpassNetworkError, OverpassSizeError, OverpassUnavailableError, placeKind, type Bounds, type Place, type PlaceKindId, type PlacesDiagnostic } from './places'
 import { isPlacesEntryFresh, type CachedPlaces, type PlacesCache } from './placesCache'
 import { diagnosticErrorName, placesAbortReason } from './placesDiagnostics'
 import { providersForBounds, type PlacesProvider } from './placesProviders'
@@ -14,7 +14,7 @@ export type PlacesProgress = {
 
 type LoaderOptions = {
   cells: PlaceCell[]
-  categories: PlaceCategory[]
+  kinds: PlaceKindId[]
   force: boolean
   cache: Pick<PlacesCache, 'get' | 'put'>
   signal: AbortSignal
@@ -44,10 +44,12 @@ function wait(milliseconds: number, signal: AbortSignal): Promise<void> {
 }
 
 export async function loadPlaces(options: LoaderOptions): Promise<void> {
-  const { cells, categories, force, cache, signal, onUpdate } = options
+  const { cells, kinds, force, cache, signal, onUpdate } = options
   const doFetch = options.fetch ?? fetchPlaces
   const pause = options.wait ?? wait
-  const keys = cells.flatMap((cell) => categories.map((category) => cellKey(cell, category)))
+  const keys = cells.flatMap((cell) => kinds.map((kind) => cellKey(cell, kind)))
+  const legacyKeys = cells.flatMap((cell) => PLACE_KINDS.filter((kind) => kinds.includes(kind.id))
+    .flatMap((kind) => [legacyCellKey(cell, kind.category), legacyKindCellKey(cell, kind.id)]))
   async function cacheOperation<T>(phase: 'cache-read' | 'cache-write', count: number, operation: () => Promise<T>): Promise<T> {
     const startedAt = new Date().toISOString()
     const start = performance.now()
@@ -62,18 +64,37 @@ export async function loadPlaces(options: LoaderOptions): Promise<void> {
     } finally {
       options.onDiagnostic?.({ startedAt, durationMs: Math.round(performance.now() - start), provider: null, phase, httpStatus: null,
         outcome, detail: null, abortReason: outcome === 'aborted' ? placesAbortReason(signal) : null, errorName,
-        categoryCount: categories.length, itemCount: count, responseBytes: null, splitDepth: null, retryAfterMs: null })
+        kindCount: kinds.length, itemCount: count, responseBytes: null, splitDepth: null, retryAfterMs: null })
     }
   }
-  const entries = await cacheOperation('cache-read', keys.length, () => cache.get(keys))
+  const allKeys = [...new Set([...keys, ...legacyKeys])]
+  const entries = await cacheOperation('cache-read', allKeys.length, () => cache.get(allKeys))
   signal.throwIfAborted()
-  const batches = batchesForCells(cells, categories, entries, force)
-  let pending = batches.reduce((total, batch) => total + batch.cells.length * batch.categories.length, 0)
+  // Older cache entries excluded access=customers and may be incomplete.
+  const incompleteKeys = new Set<string>()
+  for (const cell of cells) {
+    for (const kind of PLACE_KINDS.filter((item) => kinds.includes(item.id))) {
+      const key = cellKey(cell, kind.id)
+      if (entries.has(key)) continue
+      const oldCategory = entries.get(legacyCellKey(cell, kind.category))
+      const oldKind = entries.get(legacyKindCellKey(cell, kind.id))
+      const legacy = oldCategory && (!oldKind || oldCategory.downloadedAt > oldKind.downloadedAt) ? oldCategory : oldKind
+      if (legacy) {
+        entries.set(key, { key, downloadedAt: legacy.downloadedAt,
+          places: legacy.places.filter((place) => Boolean(placeKind(place, [kind.id]))) })
+        incompleteKeys.add(key)
+      }
+    }
+  }
+  for (const legacyKey of legacyKeys) entries.delete(legacyKey)
+  const completeEntries = new Map([...entries].filter(([key]) => !incompleteKeys.has(key)))
+  const batches = batchesForCells(cells, kinds, completeEntries, force)
+  let pending = batches.reduce((total, batch) => total + batch.cells.length * batch.kinds.length, 0)
   let message = pending ? 'Orte werden geladen …' : 'Orte sind aktuell.'
   function report() {
     const stale = keys.filter((key) => {
       const entry = entries.get(key)
-      return entry && !isPlacesEntryFresh(entry)
+      return entry && (incompleteKeys.has(key) || !isPlacesEntryFresh(entry))
     }).length
     onUpdate(new Map(entries), {
       available: keys.filter((key) => entries.has(key)).length,
@@ -86,7 +107,7 @@ export async function loadPlaces(options: LoaderOptions): Promise<void> {
   report()
   const unavailableProviders = new Set<string>()
 
-  async function attempt(bounds: Bounds, selected: PlaceCategory[], depth: number, provider: PlacesProvider, fallbackFrom?: string): Promise<Place[]> {
+  async function attempt(bounds: Bounds, selected: PlaceKindId[], depth: number, provider: PlacesProvider, fallbackFrom?: string): Promise<Place[]> {
     signal.throwIfAborted()
     const delay = Math.max(0, lastRequestAt + 1000 - Date.now(), nextAllowedAt - Date.now())
     if (delay) {
@@ -124,7 +145,7 @@ export async function loadPlaces(options: LoaderOptions): Promise<void> {
     }
   }
 
-  async function fetchPart(bounds: Bounds, selected: PlaceCategory[], depth: number): Promise<Place[]> {
+  async function fetchPart(bounds: Bounds, selected: PlaceKindId[], depth: number): Promise<Place[]> {
     const providers = providersForBounds(bounds)
     try {
       for (let index = 0; index < providers.length; index++) {
@@ -169,28 +190,31 @@ export async function loadPlaces(options: LoaderOptions): Promise<void> {
   for (const batch of batches) {
     let result: Place[]
     try {
-      result = await fetchPart(batch.bounds, batch.categories, 0)
+      result = await fetchPart(batch.bounds, batch.kinds, 0)
     } catch (error) {
       if (!(error instanceof OverpassHttpError) || error.status !== 429) throw error
       message = `Overpass bittet um eine Pause (${Math.ceil(error.retryAfterMs / 1000)} Sekunden) …`
       report()
       await pause(error.retryAfterMs, signal)
       signal.throwIfAborted()
-      result = await fetchPart(batch.bounds, batch.categories, 0)
+      result = await fetchPart(batch.bounds, batch.kinds, 0)
     }
     signal.throwIfAborted()
     const downloadedAt = Date.now()
-    const updates = batch.cells.flatMap((cell) => batch.categories.map((category): CachedPlaces => ({
-      key: cellKey(cell, category),
+    const updates = batch.cells.flatMap((cell) => batch.kinds.map((kind): CachedPlaces => ({
+      key: cellKey(cell, kind),
       downloadedAt,
       places: result.filter((place) => {
         const location = cellForPosition(place.latitude, place.longitude)
-        return location.x === cell.x && location.y === cell.y && Boolean(placeKind(place, [category]))
+        return location.x === cell.x && location.y === cell.y && Boolean(placeKind(place, [kind]))
       }),
     })))
     await cacheOperation('cache-write', updates.length, () => cache.put(updates, signal))
     signal.throwIfAborted()
-    for (const entry of updates) entries.set(entry.key, entry)
+    for (const entry of updates) {
+      entries.set(entry.key, entry)
+      incompleteKeys.delete(entry.key)
+    }
     pending -= updates.length
     message = pending ? 'Orte werden geladen …' : 'Orte sind aktuell.'
     report()

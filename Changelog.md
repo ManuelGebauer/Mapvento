@@ -10,8 +10,12 @@ once released versions are maintained.
 
 ### Added
 
-- Optional OpenStreetMap places with category filters, a persistent 14-day
-  cache, download status, manual refresh, Dresel Overpass for covered European
+- Optional OpenStreetMap places, including customer-accessible places, with
+  individually selectable, grouped types, automatic bounded viewport loading
+  after type selection, a persistent
+  14-day cache, panel-only download status with a compact load control,
+  panel-aware toolbar highlighting,
+  manual refresh, Dresel Overpass for covered European
   and North American regions, Private.coffee as fallback or worldwide provider, and
   opt-in diagnostics for requests, cancellation causes, and cache operations
   without recording coordinates or response text. Service timeouts are reported without assuming

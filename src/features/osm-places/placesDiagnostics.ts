@@ -15,7 +15,7 @@ export type PlacesDiagnostic = {
     'invalid-data' | 'overpass-error' | 'network-or-cors' | 'body-unavailable' | 'invalid-request' | null
   abortReason: PlacesAbortReason | null
   errorName: string | null
-  categoryCount: number
+  kindCount: number
   itemCount: number | null
   responseBytes: number | null
   splitDepth: number | null

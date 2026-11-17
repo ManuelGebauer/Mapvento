@@ -1,5 +1,6 @@
-import { PLACE_CATEGORIES, type Bounds, type PlaceCategory } from './places'
-import { isPlacesEntryFresh, type CachedPlaces } from './placesCache'
+import { PLACE_KINDS, type Bounds, type PlaceCategory, type PlaceKindId } from './places'
+import type { CachedPlaces } from './placesCache'
+import { isPlacesEntryFresh } from './placesFreshness'
 
 export const PLACES_ZOOM = 14
 export const PLACES_MAX_CELLS = 64
@@ -7,7 +8,7 @@ const SIZE = 2 ** PLACES_ZOOM
 const MAX_LATITUDE = 85.05112878
 
 export type PlaceCell = { x: number; y: number; bounds: Bounds }
-export type PlaceBatch = { cells: PlaceCell[]; categories: PlaceCategory[]; bounds: Bounds }
+export type PlaceBatch = { cells: PlaceCell[]; kinds: PlaceKindId[]; bounds: Bounds }
 
 function latitudeToY(latitude: number): number {
   const lat = Math.max(-MAX_LATITUDE, Math.min(MAX_LATITUDE, latitude)) * Math.PI / 180
@@ -23,6 +24,18 @@ function makeCell(x: number, y: number): PlaceCell {
     south: yToLatitude(y + 1), north: yToLatitude(y),
     west: x / SIZE * 360 - 180, east: (x + 1) / SIZE * 360 - 180,
   } }
+}
+
+export function cachedCell(x: number, y: number): PlaceCell | undefined {
+  if (!Number.isInteger(x) || !Number.isInteger(y) || x < 0 || y < 0 || x >= SIZE || y >= SIZE) return
+  return makeCell(x, y)
+}
+
+export function cellIntersectsBounds(cell: PlaceCell, bounds: Bounds): boolean {
+  if (cell.bounds.north < bounds.south || cell.bounds.south > bounds.north) return false
+  if (bounds.east - bounds.west >= 360) return true
+  const world = Math.ceil((bounds.west - cell.bounds.east) / 360)
+  return cell.bounds.west + world * 360 <= bounds.east
 }
 
 export function cellsForBounds(bounds: Bounds): PlaceCell[] {
@@ -50,36 +63,43 @@ export function cellForPosition(latitude: number, longitude: number): PlaceCell 
   return makeCell(x, y)
 }
 
-export function cellKey(cell: PlaceCell, category: PlaceCategory): string {
-  // Preserve the original cache namespace across provider changes.
+export function legacyCellKey(cell: PlaceCell, category: PlaceCategory): string {
   return `v1:private-coffee:${PLACES_ZOOM}:${cell.x}:${cell.y}:${category}`
 }
 
-export function batchesForCells(cells: readonly PlaceCell[], categories: readonly PlaceCategory[],
+export function legacyKindCellKey(cell: PlaceCell, kind: PlaceKindId): string {
+  return `v2:places:${PLACES_ZOOM}:${cell.x}:${cell.y}:${kind}`
+}
+
+export function cellKey(cell: PlaceCell, kind: PlaceKindId): string {
+  return `v3:places:${PLACES_ZOOM}:${cell.x}:${cell.y}:${kind}`
+}
+
+export function batchesForCells(cells: readonly PlaceCell[], kinds: readonly PlaceKindId[],
   cached: ReadonlyMap<string, CachedPlaces>, force = false, now = Date.now()): PlaceBatch[] {
-  const selected = PLACE_CATEGORIES.map((item) => item.id).filter((id) => categories.includes(id))
-  const pending = new Map<string, { cell: PlaceCell; categories: PlaceCategory[] }>()
+  const selected = PLACE_KINDS.map((item) => item.id).filter((id) => kinds.includes(id))
+  const pending = new Map<string, { cell: PlaceCell; kinds: PlaceKindId[] }>()
   for (const cell of cells) {
-    const needed = selected.filter((category) => {
-      const entry = cached.get(cellKey(cell, category))
+    const needed = selected.filter((kind) => {
+      const entry = cached.get(cellKey(cell, kind))
       return force || !entry || !isPlacesEntryFresh(entry, now)
     })
-    if (needed.length) pending.set(`${cell.x}:${cell.y}`, { cell, categories: needed })
+    if (needed.length) pending.set(`${cell.x}:${cell.y}`, { cell, kinds: needed })
   }
   const batches: PlaceBatch[] = []
   const sorted = Array.from(pending.values()).sort((a, b) => a.cell.y - b.cell.y || a.cell.x - b.cell.x)
   for (const first of sorted) {
     const id = `${first.cell.x}:${first.cell.y}`
     if (!pending.has(id)) continue
-    const signature = first.categories.join(',')
+    const signature = first.kinds.join(',')
     let endX = first.cell.x
-    while (pending.get(`${endX + 1}:${first.cell.y}`)?.categories.join(',') === signature) endX++
+    while (pending.get(`${endX + 1}:${first.cell.y}`)?.kinds.join(',') === signature) endX++
     let endY = first.cell.y
     for (;;) {
       const nextY = endY + 1
       let complete = true
       for (let x = first.cell.x; x <= endX; x++) {
-        if (pending.get(`${x}:${nextY}`)?.categories.join(',') !== signature) complete = false
+        if (pending.get(`${x}:${nextY}`)?.kinds.join(',') !== signature) complete = false
       }
       if (!complete) break
       endY = nextY
@@ -94,7 +114,7 @@ export function batchesForCells(cells: readonly PlaceCell[], categories: readonl
       }
     }
     batches.push({
-      cells: grouped, categories: first.categories,
+      cells: grouped, kinds: first.kinds,
       bounds: {
         south: yToLatitude(endY + 1), north: yToLatitude(first.cell.y),
         west: first.cell.x / SIZE * 360 - 180, east: (endX + 1) / SIZE * 360 - 180,

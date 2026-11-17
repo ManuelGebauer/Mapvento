@@ -238,14 +238,110 @@
   position: relative;
 }
 
+.map-layer-panel.osm-places-panel {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.osm-places-panel-content {
+  min-height: 0;
+  padding-inline-end: 16px;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+
 .osm-places-option {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 3px 0;
+  gap: 8px;
+  padding: 5px 0;
+  cursor: pointer;
 }
 
-.osm-places-panel > button:not(.map-layer-close) {
+.osm-places-option input {
+  margin-left: auto;
+}
+
+.osm-places-kind-icon,
+.osm-places-kind-icon svg {
+  display: block;
+  width: 18px;
+  height: 18px;
+}
+
+.osm-places-panel fieldset {
+  padding-top: 6px;
+}
+
+.osm-places-panel legend {
+  width: 100%;
+}
+
+.osm-places-group-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.osm-places-select-all {
+  border: 0;
+  padding: 0;
+  color: #315a44;
+  background: transparent;
+  cursor: pointer;
+  font-size: 11px;
+}
+
+.osm-places-status-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 5px 0;
+}
+
+.osm-places-panel-status {
+  flex: 1;
+  min-width: 0;
+}
+
+.osm-places-load {
+  display: grid;
+  flex: none;
+  width: 30px;
+  height: 30px;
+  padding: 5px;
+  place-items: center;
+  border: 1px solid rgba(38, 52, 59, 0.18);
+  border-radius: 5px;
+  color: #52636b;
+  background: transparent;
+  cursor: pointer;
+}
+
+.osm-places-load:hover:not(:disabled),
+.osm-places-load:focus-visible {
+  color: #10251a;
+  background: rgba(194, 245, 198, 0.96);
+}
+
+.osm-places-load:disabled {
+  color: rgba(38, 52, 59, 0.35);
+  cursor: not-allowed;
+}
+
+.osm-places-load svg {
+  width: 16px;
+  height: 16px;
+  vertical-align: middle;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.osm-places-panel-content > button {
   display: block;
   margin: 5px 0;
 }
@@ -254,27 +350,6 @@
 .osm-places-attribution {
   margin: 6px 0;
   overflow-wrap: anywhere;
-}
-
-.osm-places-status {
-  position: absolute;
-  left: 40px;
-  top: 0;
-  width: min(250px, calc(100vw - 90px));
-  padding: 6px 8px;
-  border-radius: 5px;
-  color: #26343b;
-  background: rgba(255, 255, 255, 0.96);
-  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.25);
-  font-size: 12px;
-  pointer-events: auto;
-}
-
-.osm-places-status a {
-  display: inline-block;
-  margin-top: 4px;
-  color: #315a44;
-  font-weight: 700;
 }
 
 .osm-place-marker {

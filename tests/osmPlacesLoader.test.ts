@@ -1,12 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { loadPlaces, type PlacesProgress } from '../src/features/osm-places/loadPlaces'
-import { cellForPosition, cellKey } from '../src/features/osm-places/placeCells'
+import { cellForPosition, cellKey, legacyCellKey, legacyKindCellKey } from '../src/features/osm-places/placeCells'
 import { OverpassHttpError, OverpassSizeError, type Place } from '../src/features/osm-places/places'
 import { PLACES_MAX_AGE, type CachedPlaces } from '../src/features/osm-places/placesCache'
 import { DRESEL_EUROPE, PRIVATE_COFFEE } from '../src/features/osm-places/placesProviders'
 
 const cell = cellForPosition(50, 8)
-const key = cellKey(cell, 'water')
+const key = cellKey(cell, 'spring')
 const place: Place = { type: 'node', id: 1, latitude: 50, longitude: 8, tags: { natural: 'spring' } }
 const immediateWait = async () => {}
 
@@ -16,7 +16,7 @@ describe('OSM place loading', () => {
     const old: CachedPlaces = { key, downloadedAt: Date.now() - PLACES_MAX_AGE, places: [] }
     const cache = { get: vi.fn().mockResolvedValue(new Map([[key, old]])), put: vi.fn().mockResolvedValue(undefined) }
     const updates: Array<{ entries: ReadonlyMap<string, CachedPlaces>; progress: PlacesProgress }> = []
-    await loadPlaces({ cells: [cell], categories: ['water'], force: false, cache,
+    await loadPlaces({ cells: [cell], kinds: ['spring'], force: false, cache,
       signal: new AbortController().signal, fetch: vi.fn().mockResolvedValue([place]), wait: immediateWait,
       onUpdate: (entries, progress) => updates.push({ entries, progress }) })
     expect(updates[0].progress).toMatchObject({ available: 1, stale: 1, pending: 1 })
@@ -25,12 +25,64 @@ describe('OSM place loading', () => {
     expect(cache.put).toHaveBeenCalledOnce()
   })
 
+  it.each([
+    ['category', legacyCellKey(cell, 'water')],
+    ['kind', legacyKindCellKey(cell, 'spring')],
+  ])('shows the old %s cache while reloading potentially missing customer places', async (_version, legacyKey) => {
+    const drinking: Place = { ...place, id: 2, tags: { amenity: 'drinking_water' } }
+    const customer: Place = { ...place, id: 3, tags: { natural: 'spring', access: 'customers' } }
+    const legacy: CachedPlaces = { key: legacyKey, downloadedAt: Date.now(), places: [place, drinking] }
+    const cache = { get: vi.fn().mockResolvedValue(new Map([[legacyKey, legacy]])), put: vi.fn().mockResolvedValue(undefined) }
+    const fetch = vi.fn().mockResolvedValue([place, customer])
+    const updates: Array<{ entries: ReadonlyMap<string, CachedPlaces>; progress: PlacesProgress }> = []
+    await loadPlaces({ cells: [cell], kinds: ['spring'], force: false, cache,
+      signal: new AbortController().signal, fetch, wait: immediateWait,
+      onUpdate: (entries, progress) => updates.push({ entries, progress }) })
+    expect(updates[0].entries.get(key)).toEqual({ key, downloadedAt: legacy.downloadedAt, places: [place] })
+    expect(updates[0].progress).toMatchObject({ available: 1, stale: 1, pending: 1 })
+    expect(fetch).toHaveBeenCalledOnce()
+    expect(updates.at(-1)?.entries.get(key)?.places).toEqual([place, customer])
+    expect(updates.at(-1)?.entries.has(cellKey(cell, 'drinking-water'))).toBe(false)
+    expect(updates.at(-1)?.progress).toMatchObject({ stale: 0, pending: 0 })
+    expect(cache.put.mock.calls[0][0][0].key).toBe(key)
+  })
+
+  it('keeps older data visible on reload failure and prefers a complete current entry', async () => {
+    const legacyKey = legacyKindCellKey(cell, 'spring')
+    const legacy: CachedPlaces = { key: legacyKey, downloadedAt: Date.now(), places: [place] }
+    const cache = { get: vi.fn().mockResolvedValue(new Map([[legacyKey, legacy]])), put: vi.fn() }
+    const updates: Array<ReadonlyMap<string, CachedPlaces>> = []
+    await expect(loadPlaces({ cells: [cell], kinds: ['spring'], force: false, cache,
+      signal: new AbortController().signal, fetch: vi.fn().mockRejectedValue(new Error('offline')), wait: immediateWait,
+      onUpdate: (entries) => updates.push(entries) })).rejects.toThrow('offline')
+    expect(updates.at(-1)?.get(key)?.places).toEqual([place])
+    expect(cache.put).not.toHaveBeenCalled()
+
+    const current: CachedPlaces = { key, downloadedAt: Date.now() - 1, places: [] }
+    cache.get.mockResolvedValue(new Map([[legacyKey, legacy], [key, current]]))
+    const fetch = vi.fn()
+    await loadPlaces({ cells: [cell], kinds: ['spring'], force: false, cache,
+      signal: new AbortController().signal, fetch, wait: immediateWait, onUpdate: (entries) => updates.push(entries) })
+    expect(fetch).not.toHaveBeenCalled()
+    expect(updates.at(-1)?.get(key)).toEqual(current)
+  })
+
+  it('fetches a missing type even when another type in the same group is cached', async () => {
+    const spring: CachedPlaces = { key, downloadedAt: Date.now(), places: [place] }
+    const cache = { get: vi.fn().mockResolvedValue(new Map([[key, spring]])), put: vi.fn().mockResolvedValue(undefined) }
+    const fetch = vi.fn().mockResolvedValue([])
+    await loadPlaces({ cells: [cell], kinds: ['spring', 'drinking-water'], force: false, cache,
+      signal: new AbortController().signal, fetch, wait: immediateWait, onUpdate: () => {} })
+    expect(fetch.mock.calls[0][1]).toEqual(['drinking-water'])
+    expect(cache.put.mock.calls[0][0][0].key).toBe(cellKey(cell, 'drinking-water'))
+  })
+
   it('waits after a rate limit and keeps existing data on failure', async () => {
     const old: CachedPlaces = { key, downloadedAt: Date.now(), places: [place] }
     const cache = { get: vi.fn().mockResolvedValue(new Map([[key, old]])), put: vi.fn() }
     const fetch = vi.fn().mockRejectedValueOnce(new OverpassHttpError(429, null)).mockRejectedValueOnce(new Error('offline'))
     const wait = vi.fn().mockResolvedValue(undefined)
-    await expect(loadPlaces({ cells: [cell], categories: ['water'], force: true, cache,
+    await expect(loadPlaces({ cells: [cell], kinds: ['spring'], force: true, cache,
       signal: new AbortController().signal, fetch, wait, onUpdate: () => {} })).rejects.toThrow('offline')
     expect(wait.mock.calls.some(([duration]) => duration === 30_000)).toBe(true)
     expect(fetch.mock.calls.map((call) => call[5])).toEqual([DRESEL_EUROPE, DRESEL_EUROPE])
@@ -42,7 +94,7 @@ describe('OSM place loading', () => {
     const controller = new AbortController()
     const cache = { get: vi.fn().mockResolvedValue(new Map()), put: vi.fn() }
     const fetch = vi.fn().mockImplementation(async () => { controller.abort(); return [place] })
-    await expect(loadPlaces({ cells: [cell], categories: ['water'], force: false, cache,
+    await expect(loadPlaces({ cells: [cell], kinds: ['spring'], force: false, cache,
       signal: controller.signal, fetch, wait: immediateWait, onUpdate: () => {} })).rejects.toBeDefined()
     expect(cache.put).not.toHaveBeenCalled()
   })
@@ -52,7 +104,7 @@ describe('OSM place loading', () => {
     const fetch = vi.fn()
       .mockRejectedValueOnce(new OverpassSizeError('too large'))
       .mockResolvedValue([])
-    await loadPlaces({ cells: [cell], categories: ['water'], force: false, cache,
+    await loadPlaces({ cells: [cell], kinds: ['spring'], force: false, cache,
       signal: new AbortController().signal, fetch, wait: immediateWait, onUpdate: () => {} })
     expect(fetch).toHaveBeenCalledTimes(5)
     expect(cache.put).toHaveBeenCalledOnce()
@@ -61,7 +113,7 @@ describe('OSM place loading', () => {
   it('does not split a gateway failure or assume a client timeout means the area is too large', async () => {
     const cache = { get: vi.fn().mockResolvedValue(new Map()), put: vi.fn() }
     const gateway = vi.fn().mockRejectedValue(new OverpassHttpError(504, null))
-    await expect(loadPlaces({ cells: [cell], categories: ['water'], force: false, cache,
+    await expect(loadPlaces({ cells: [cell], kinds: ['spring'], force: false, cache,
       signal: new AbortController().signal, fetch: gateway, wait: immediateWait, onUpdate: () => {} }))
       .rejects.toMatchObject({ status: 504 })
     expect(gateway).toHaveBeenCalledTimes(2)
@@ -71,7 +123,7 @@ describe('OSM place loading', () => {
       const progress: PlacesProgress[] = []
       const fetch = vi.fn().mockImplementation((_bounds, _categories, signal: AbortSignal) =>
         new Promise((_resolve, reject) => signal.addEventListener('abort', () => reject(signal.reason))))
-      const loading = loadPlaces({ cells: [cell], categories: ['water'], force: false, cache,
+      const loading = loadPlaces({ cells: [cell], kinds: ['spring'], force: false, cache,
         signal: new AbortController().signal, fetch, wait: immediateWait, onUpdate: (_entries, status) => progress.push(status) })
       const result = expect(loading).rejects.toThrow('innerhalb von 50 Sekunden')
       await vi.advanceTimersByTimeAsync(100_001)
@@ -85,7 +137,7 @@ describe('OSM place loading', () => {
   it('identifies cache read and write failures without exposing stored keys or error text', async () => {
     const diagnostic = vi.fn()
     const readFailure = { get: vi.fn().mockRejectedValue(new Error('secret 50,8')), put: vi.fn() }
-    const options = { cells: [cell], categories: ['water' as const], force: false,
+    const options = { cells: [cell], kinds: ['spring' as const], force: false,
       signal: new AbortController().signal, wait: immediateWait, onUpdate: () => {}, onDiagnostic: diagnostic }
     await expect(loadPlaces({ ...options, cache: readFailure })).rejects.toThrow()
     expect(diagnostic).toHaveBeenLastCalledWith(expect.objectContaining({ phase: 'cache-read', outcome: 'cache-error' }))
@@ -100,7 +152,7 @@ describe('OSM place loading', () => {
     const fetch = vi.fn().mockImplementation(async () => new Response(JSON.stringify({ remark: 'runtime error: Query timed out', elements: [] })))
     vi.stubGlobal('fetch', fetch)
     const cache = { get: vi.fn().mockResolvedValue(new Map()), put: vi.fn() }
-    await expect(loadPlaces({ cells: [cell], categories: ['water'], force: false, cache,
+    await expect(loadPlaces({ cells: [cell], kinds: ['spring'], force: false, cache,
       signal: new AbortController().signal, wait: immediateWait, onUpdate: () => {} }))
       .rejects.toThrow('Zeitlimit des Servers')
     expect(fetch).toHaveBeenCalledTimes(2)
@@ -117,7 +169,7 @@ describe('OSM place loading', () => {
       .mockImplementation(async () => new Response(JSON.stringify({ elements: [] })))
     vi.stubGlobal('fetch', fetch)
     const cache = { get: vi.fn().mockResolvedValue(new Map()), put: vi.fn().mockResolvedValue(undefined) }
-    await loadPlaces({ cells: [first, second], categories: ['food'], force: false, cache,
+    await loadPlaces({ cells: [first, second], kinds: ['restaurant'], force: false, cache,
       signal: new AbortController().signal, wait: immediateWait, onUpdate: (_entries, status) => progress.push(status),
       onDiagnostic: events })
     expect(fetch.mock.calls.map(([url]) => url)).toEqual([
@@ -137,7 +189,7 @@ describe('OSM place loading', () => {
       controller.abort()
       throw new OverpassHttpError(503, null)
     })
-    await expect(loadPlaces({ cells: [cell], categories: ['water'], force: false, cache,
+    await expect(loadPlaces({ cells: [cell], kinds: ['spring'], force: false, cache,
       signal: controller.signal, fetch, wait: immediateWait, onUpdate: () => {} })).rejects.toBeDefined()
     expect(fetch).toHaveBeenCalledOnce()
     expect(cache.put).not.toHaveBeenCalled()
@@ -151,7 +203,7 @@ describe('OSM place loading', () => {
     fetch.mockResolvedValueOnce(new Response(JSON.stringify({ elements: [] })))
     vi.stubGlobal('fetch', fetch)
     const cache = { get: vi.fn().mockResolvedValue(new Map()), put: vi.fn().mockResolvedValue(undefined) }
-    await loadPlaces({ cells: [cell], categories: ['water'], force: false, cache,
+    await loadPlaces({ cells: [cell], kinds: ['spring'], force: false, cache,
       signal: new AbortController().signal, wait: immediateWait, onUpdate: () => {} })
     expect(fetch.mock.calls.map(([url]) => url)).toEqual([DRESEL_EUROPE.endpoint, PRIVATE_COFFEE.endpoint])
     expect(cache.put).toHaveBeenCalledOnce()

@@ -1,6 +1,8 @@
-import { parsePlaces, type Place } from './places'
+import { PLACE_KINDS, parsePlaces, placeKind, type Bounds, type Place, type PlaceKindId } from './places'
+import { cachedCell, cellIntersectsBounds, cellKey, PLACES_ZOOM } from './placeCells'
 
-export const PLACES_MAX_AGE = 14 * 24 * 60 * 60 * 1000
+export { isPlacesEntryFresh, PLACES_MAX_AGE } from './placesFreshness'
+
 const CACHE_LIMIT_BYTES = 20 * 1024 * 1024
 const CACHE_VERSION = 1
 
@@ -46,10 +48,6 @@ function readEntry(value: unknown): CachedPlaces {
     }
   })
   return { key: entry.key, downloadedAt: entry.downloadedAt, places: parsePlaces({ elements }) }
-}
-
-export function isPlacesEntryFresh(entry: CachedPlaces, now = Date.now()): boolean {
-  return entry.downloadedAt <= now && now - entry.downloadedAt < PLACES_MAX_AGE
 }
 
 export class PlacesCache {
@@ -105,6 +103,44 @@ export class PlacesCache {
         store.delete(keys[index])
       }
     })
+    await done
+    return result
+  }
+
+  async getVisible(bounds: Bounds, kinds: readonly PlaceKindId[]): Promise<Map<string, CachedPlaces>> {
+    const db = await this.open()
+    const tx = db.transaction('places', 'readwrite')
+    const done = transactionDone(tx)
+    const store = tx.objectStore('places')
+    const values = await request<unknown[]>(store.getAll())
+    const result = new Map<string, CachedPlaces>()
+    const complete = new Set<string>()
+    for (const value of values) {
+      if (!isRecord(value) || typeof value.key !== 'string') continue
+      const match = /^(v1:private-coffee|v2:places|v3:places):(\d+):(\d+):(\d+):([a-z-]+)$/.exec(value.key)
+      if (!match || Number(match[2]) !== PLACES_ZOOM) continue
+      const cell = cachedCell(Number(match[3]), Number(match[4]))
+      if (!cell || !cellIntersectsBounds(cell, bounds)) continue
+      const candidates = PLACE_KINDS.filter((kind) => kinds.includes(kind.id) &&
+        (match[1] === 'v1:private-coffee' ? kind.category === match[5] : kind.id === match[5]))
+      if (!candidates.length) continue
+      let entry: CachedPlaces
+      try {
+        entry = readEntry(value)
+      } catch {
+        store.delete(value.key)
+        continue
+      }
+      for (const kind of candidates) {
+        const key = cellKey(cell, kind.id)
+        const current = match[1] === 'v3:places'
+        const previous = result.get(key)
+        if (complete.has(key) || (!current && previous && previous.downloadedAt >= entry.downloadedAt)) continue
+        result.set(key, { key, downloadedAt: entry.downloadedAt,
+          places: entry.places.filter((place) => Boolean(placeKind(place, [kind.id]))) })
+        if (current) complete.add(key)
+      }
+    }
     await done
     return result
   }

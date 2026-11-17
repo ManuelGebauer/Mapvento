@@ -41,35 +41,35 @@ export class OverpassUnavailableError extends Error {}
 export class OverpassNetworkError extends Error {}
 export class OverpassInvalidResponseError extends Error {}
 
-type PlaceKind = { category: PlaceCategory; key: string; value: string; icon: PoiIconId }
+export const PLACE_KINDS = [
+  { id: 'spring', label: 'Wasserquellen', category: 'water', key: 'natural', value: 'spring', icon: POI_ICON_IDS.spring },
+  { id: 'drinking-water', label: 'Trinkwasser', category: 'water', key: 'amenity', value: 'drinking_water', icon: POI_ICON_IDS.drinkingWater },
+  { id: 'shelter', label: 'Schutzhütten', category: 'lodging', key: 'amenity', value: 'shelter', icon: POI_ICON_IDS.shelter },
+  { id: 'camp', label: 'Campingplätze', category: 'lodging', key: 'tourism', value: 'camp_site', icon: POI_ICON_IDS.camp },
+  { id: 'alpine-hut', label: 'Berghütten', category: 'lodging', key: 'tourism', value: 'alpine_hut', icon: POI_ICON_IDS.alpineHut },
+  { id: 'wilderness-hut', label: 'Wildnishütten', category: 'lodging', key: 'tourism', value: 'wilderness_hut', icon: POI_ICON_IDS.wildernessHut },
+  { id: 'picnic', label: 'Picknickplätze', category: 'lodging', key: 'tourism', value: 'picnic_site', icon: POI_ICON_IDS.picnic },
+  { id: 'summit', label: 'Gipfel', category: 'info', key: 'natural', value: 'peak', icon: POI_ICON_IDS.summit },
+  { id: 'viewpoint', label: 'Aussichtspunkte', category: 'info', key: 'tourism', value: 'viewpoint', icon: POI_ICON_IDS.viewpoint },
+  { id: 'attraction', label: 'Sehenswürdigkeiten', category: 'info', key: 'tourism', value: 'attraction', icon: POI_ICON_IDS.attraction },
+  { id: 'museum', label: 'Museen', category: 'info', key: 'tourism', value: 'museum', icon: POI_ICON_IDS.museum },
+  { id: 'restaurant', label: 'Restaurants', category: 'food', key: 'amenity', value: 'restaurant', icon: POI_ICON_IDS.restaurant },
+  { id: 'cafe', label: 'Cafés', category: 'food', key: 'amenity', value: 'cafe', icon: POI_ICON_IDS.cafe },
+  { id: 'supermarket', label: 'Supermärkte', category: 'food', key: 'shop', value: 'supermarket', icon: POI_ICON_IDS.supermarket },
+  { id: 'toilet', label: 'Toiletten', category: 'service', key: 'amenity', value: 'toilets', icon: POI_ICON_IDS.toilet },
+  { id: 'shower', label: 'Duschen', category: 'service', key: 'amenity', value: 'shower', icon: POI_ICON_IDS.shower },
+  { id: 'atm', label: 'Geldautomaten', category: 'service', key: 'amenity', value: 'atm', icon: POI_ICON_IDS.atm },
+  { id: 'parking', label: 'Parkplätze', category: 'service', key: 'amenity', value: 'parking', icon: POI_ICON_IDS.parking },
+  { id: 'train', label: 'Bahnhöfe', category: 'transport', key: 'railway', value: 'station', icon: POI_ICON_IDS.train },
+  { id: 'bus-stop', label: 'Bushaltestellen', category: 'transport', key: 'highway', value: 'bus_stop', icon: POI_ICON_IDS.bus },
+  { id: 'bus-station', label: 'Busbahnhöfe', category: 'transport', key: 'amenity', value: 'bus_station', icon: POI_ICON_IDS.bus },
+  { id: 'ferry', label: 'Fähranleger', category: 'transport', key: 'amenity', value: 'ferry_terminal', icon: POI_ICON_IDS.ferry },
+] as const satisfies readonly { id: string; label: string; category: PlaceCategory; key: string; value: string; icon: PoiIconId }[]
 
-export const PLACE_KINDS: readonly PlaceKind[] = [
-  { category: 'water', key: 'natural', value: 'spring', icon: POI_ICON_IDS.spring },
-  { category: 'water', key: 'amenity', value: 'drinking_water', icon: POI_ICON_IDS.drinkingWater },
-  { category: 'lodging', key: 'amenity', value: 'shelter', icon: POI_ICON_IDS.shelter },
-  { category: 'lodging', key: 'tourism', value: 'camp_site', icon: POI_ICON_IDS.camp },
-  { category: 'lodging', key: 'tourism', value: 'alpine_hut', icon: POI_ICON_IDS.alpineHut },
-  { category: 'lodging', key: 'tourism', value: 'wilderness_hut', icon: POI_ICON_IDS.wildernessHut },
-  { category: 'lodging', key: 'tourism', value: 'picnic_site', icon: POI_ICON_IDS.picnic },
-  { category: 'info', key: 'natural', value: 'peak', icon: POI_ICON_IDS.summit },
-  { category: 'info', key: 'tourism', value: 'viewpoint', icon: POI_ICON_IDS.viewpoint },
-  { category: 'info', key: 'tourism', value: 'attraction', icon: POI_ICON_IDS.attraction },
-  { category: 'info', key: 'tourism', value: 'museum', icon: POI_ICON_IDS.museum },
-  { category: 'food', key: 'amenity', value: 'restaurant', icon: POI_ICON_IDS.restaurant },
-  { category: 'food', key: 'amenity', value: 'cafe', icon: POI_ICON_IDS.cafe },
-  { category: 'food', key: 'shop', value: 'supermarket', icon: POI_ICON_IDS.supermarket },
-  { category: 'service', key: 'amenity', value: 'toilets', icon: POI_ICON_IDS.toilet },
-  { category: 'service', key: 'amenity', value: 'shower', icon: POI_ICON_IDS.shower },
-  { category: 'service', key: 'amenity', value: 'atm', icon: POI_ICON_IDS.atm },
-  { category: 'service', key: 'amenity', value: 'parking', icon: POI_ICON_IDS.parking },
-  { category: 'transport', key: 'railway', value: 'station', icon: POI_ICON_IDS.train },
-  { category: 'transport', key: 'highway', value: 'bus_stop', icon: POI_ICON_IDS.bus },
-  { category: 'transport', key: 'amenity', value: 'bus_station', icon: POI_ICON_IDS.bus },
-  { category: 'transport', key: 'amenity', value: 'ferry_terminal', icon: POI_ICON_IDS.ferry },
-]
+export type PlaceKindId = typeof PLACE_KINDS[number]['id']
 
-export function placeKind(place: Place, categories: readonly PlaceCategory[]): PlaceKind | undefined {
-  return PLACE_KINDS.find((kind) => categories.includes(kind.category) && place.tags[kind.key] === kind.value)
+export function placeKind(place: Place, kinds: readonly PlaceKindId[]): typeof PLACE_KINDS[number] | undefined {
+  return PLACE_KINDS.find((kind) => kinds.includes(kind.id) && place.tags[kind.key] === kind.value)
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -95,18 +95,19 @@ export function parsePlaces(value: unknown): Place[] {
     }
     return { type: element.type, id: element.id, latitude: position.lat, longitude: position.lon, tags }
   }).filter((place: Place) => ![
-    'private', 'no', 'customers', 'permit', 'restricted', 'military', 'agricultural', 'forestry',
+    'private', 'no', 'permit', 'restricted', 'military', 'agricultural', 'forestry',
   ].includes(place.tags.access?.trim().toLowerCase() ?? ''))
 }
 
-export function buildPlacesQuery(bounds: Bounds, categories: readonly PlaceCategory[]): string {
+export function buildPlacesQuery(bounds: Bounds, kinds: readonly PlaceKindId[]): string {
   if (![bounds.south, bounds.west, bounds.north, bounds.east].every(Number.isFinite) ||
     bounds.south < -90 || bounds.north > 90 || bounds.west < -180 || bounds.east > 180 ||
-    bounds.south >= bounds.north || bounds.west >= bounds.east || categories.length === 0) {
-    throw new Error('Ungültiger Kartenbereich oder keine Kategorie ausgewählt')
+    bounds.south >= bounds.north || bounds.west >= bounds.east || kinds.length === 0 ||
+    kinds.some((id) => !PLACE_KINDS.some((kind) => kind.id === id))) {
+    throw new Error('Ungültiger Kartenbereich oder kein Ortstyp ausgewählt')
   }
   const bbox = `${bounds.south},${bounds.west},${bounds.north},${bounds.east}`
-  const selectors = PLACE_KINDS.filter((kind) => categories.includes(kind.category))
+  const selectors = PLACE_KINDS.filter((kind) => kinds.includes(kind.id))
     .map((kind) => `nwr["${kind.key}"="${kind.value}"](${bbox});`).join('')
   return `[out:json][timeout:25];(${selectors});out center;`
 }
@@ -141,7 +142,7 @@ async function readErrorDetail(response: Response, signal: AbortSignal): Promise
   }
 }
 
-export async function fetchPlaces(bounds: Bounds, categories: readonly PlaceCategory[], signal: AbortSignal,
+export async function fetchPlaces(bounds: Bounds, kinds: readonly PlaceKindId[], signal: AbortSignal,
   onDiagnostic?: (event: PlacesDiagnostic) => void, collectDetails: () => boolean = () => Boolean(onDiagnostic),
   provider: PlacesProvider = PRIVATE_COFFEE): Promise<Place[]> {
   const startedAt = new Date().toISOString()
@@ -155,7 +156,7 @@ export async function fetchPlaces(bounds: Bounds, categories: readonly PlaceCate
   let retryAfterMs: number | null = null
   let itemCount: number | null = null
   try {
-    const query = buildPlacesQuery(bounds, categories)
+    const query = buildPlacesQuery(bounds, kinds)
     phase = 'request'
     outcome = 'network-error'
     let response: Response
@@ -269,6 +270,6 @@ export async function fetchPlaces(bounds: Bounds, categories: readonly PlaceCate
   } finally {
     onDiagnostic?.({ startedAt, durationMs: Math.round(performance.now() - start), provider: provider.id, phase, httpStatus, outcome,
       detail, abortReason: outcome === 'aborted' ? placesAbortReason(signal) : null,
-      errorName, categoryCount: categories.length, itemCount, responseBytes, splitDepth: null, retryAfterMs })
+      errorName, kindCount: kinds.length, itemCount, responseBytes, splitDepth: null, retryAfterMs })
   }
 }
