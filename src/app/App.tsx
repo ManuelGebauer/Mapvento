@@ -348,9 +348,9 @@ function App() {
     closeSearch,
     searchPlaces,
   } = placeSearch
-  const { mapContainer, focusRouteOnMap, focusSearchResultOnMap, clearSearchLayer, getMapView, mapZoom } = useLeafletMap({
+  const { mapContainer, focusRouteOnMap, focusSearchResultOnMap, clearSearchLayer, getMapView, mapZoom, osmPlaces } = useLeafletMap({
     project, setProject, activeRoute, layerId, mapLayerRetry, toolMode, routePropertiesOpen,
-    start: initial.settings.start, units: settings.units,
+    start: initial.settings.start, units: settings.units, placesDiagnostics: settings.developer.placesDiagnostics,
     mapHoveredPoint: hoveredProfilePoint, selectedNode, contextMenu, setSelectedNode, setContextMenu,
     setErrorBanner, setNotice, setCacheWarning, setSearchMessage, openPointEditor, updateNode, insertNodeAtCoordinate,
   })
@@ -881,7 +881,7 @@ function App() {
               searchLoading={searchLoading} searchMessage={searchMessage} searchResults={searchResults}
               focusSearchResultOnMap={focusSearchResultOnMap} setSearchMessage={setSearchMessage}
               toolMode={toolMode} activateToolMode={activateToolMode} activeRoute={activeRoute}
-              focusRoute={focusRoute} layerId={layerId} overlayIds={project.mapOverlayIds ?? []}
+              focusRoute={focusRoute} layerId={layerId} overlayIds={project.mapOverlayIds ?? []} osmPlaces={osmPlaces}
               changeLayer={(nextLayerId) => {
                 setLayerId(nextLayerId)
                 setProject((current) => ({ ...current, mapLayerId: nextLayerId }))

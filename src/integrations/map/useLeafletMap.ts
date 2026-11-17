@@ -9,6 +9,7 @@ import { useMapPointLayers } from './useMapPointLayers'
 import { useMapDistanceMarkers } from './useMapDistanceMarkers'
 import { useMapProfileMarker } from './useMapProfileMarker'
 import { useMapEditingInteractions } from './useMapEditingInteractions'
+import { useOsmPlaces } from '../../features/osm-places/useOsmPlaces'
 
 type Props = {
   project: ProjectFile
@@ -17,6 +18,7 @@ type Props = {
   layerId: string
   start: StartSettings
   units: Units
+  placesDiagnostics: boolean
   mapLayerRetry: { layerId: string; sequence: number } | null
   toolMode: ToolMode
   routePropertiesOpen: boolean
@@ -35,7 +37,7 @@ type Props = {
 }
 
 export function useLeafletMap({
-  project, setProject, activeRoute, layerId, start, units, mapLayerRetry, toolMode, routePropertiesOpen,
+  project, setProject, activeRoute, layerId, start, units, placesDiagnostics, mapLayerRetry, toolMode, routePropertiesOpen,
   mapHoveredPoint: hoveredProfilePoint, selectedNode, contextMenu, setSelectedNode,
   setContextMenu, setErrorBanner, setNotice, setCacheWarning, setSearchMessage, openPointEditor,
   updateNode, insertNodeAtCoordinate,
@@ -43,6 +45,7 @@ export function useLeafletMap({
   const mapContainer = useRef<HTMLDivElement>(null)
   const mapRef = useRef<L.Map | null>(null)
   const [mapInstance, setMapInstance] = useState<L.Map | null>(null)
+  const osmPlaces = useOsmPlaces(mapInstance, placesDiagnostics)
   const initialView = useRef(start)
   const searchLayerRef = useRef<L.Layer | null>(null)
   const [mapScale, setMapScale] = useState({ zoom: 7, latitude: 51.1657 })
@@ -245,5 +248,5 @@ export function useLeafletMap({
     }
   }, [])
 
-  return { mapContainer, focusRouteOnMap, focusSearchResultOnMap, clearSearchLayer, getMapView, mapZoom: mapScale.zoom }
+  return { mapContainer, focusRouteOnMap, focusSearchResultOnMap, clearSearchLayer, getMapView, mapZoom: mapScale.zoom, osmPlaces }
 }
