@@ -15,6 +15,25 @@ describe('OSM places provider', () => {
     expect(() => buildPlacesQuery({ south: 50, west: 8, north: 51, east: 9 }, [])).toThrow()
   })
 
+  it('queries and classifies all supermarket variants and the independently selected shops', () => {
+    const bounds = { south: 50, west: 8, north: 51, east: 9 }
+    const query = buildPlacesQuery(bounds, ['supermarket'])
+    for (const shop of ['supermarket', 'convenience', 'variety_store', 'general', 'food']) {
+      expect(query).toContain(`nwr["shop"="${shop}"]["shelter_type"!="public_transport"](50,8,51,9)`)
+      const place = { type: 'node' as const, id: 1, latitude: 50, longitude: 8, tags: { shop } }
+      expect(placeKind(place, ['supermarket'])?.icon).toBe('supermarket')
+      expect(placeKind(place, ['bakery', 'butcher'])).toBeUndefined()
+    }
+    expect(query).not.toContain('bakery')
+    expect(query).not.toContain('butcher')
+    for (const shop of ['bakery', 'butcher'] as const) {
+      const place = { type: 'node' as const, id: 1, latitude: 50, longitude: 8, tags: { shop } }
+      expect(buildPlacesQuery(bounds, [shop])).toContain(`nwr["shop"="${shop}"]`)
+      expect(placeKind(place, [shop])?.icon).toBe(shop)
+      expect(placeKind(place, ['supermarket'])).toBeUndefined()
+    }
+  })
+
   it('preserves tags and object identity while excluding explicitly inaccessible places', () => {
     const places = parsePlaces({ elements: [
       { type: 'node', id: 1, lat: 50, lon: 8, tags: { natural: 'spring', name: 'Quelle', access: 'yes' } },
@@ -29,6 +48,32 @@ describe('OSM places provider', () => {
     expect(places[1]).toMatchObject({ type: 'way', id: 1, latitude: 50.1, longitude: 8.1 })
     expect(placeKind(places[1], ['museum'])?.icon).toBe('museum')
     expect(placeKind(places[1], ['spring'])).toBeUndefined()
+  })
+
+  it('excludes closed objects and inactive primary tags without excluding unrelated tags', () => {
+    const node = (id: number, tags: Record<string, string>) =>
+      ({ type: 'node' as const, id, lat: 50, lon: 8, tags })
+    const places = parsePlaces({ elements: [
+      node(1, { amenity: 'restaurant', disused: ' YES ' }),
+      node(2, { amenity: 'restaurant', opening_hours: ' Closed ' }),
+      node(3, { 'disused:amenity': 'restaurant' }),
+      node(4, { amenity: 'restaurant', 'disused:amenity': 'restaurant' }),
+      node(5, { shop: 'bakery', 'abandoned:shop': 'bakery' }),
+      node(6, { amenity: 'restaurant', 'abandoned:shop': 'bakery' }),
+      node(7, { amenity: 'restaurant', disused: 'no', opening_hours: 'Mo-Fr 09:00-17:00' }),
+      node(8, { natural: 'spring', 'abandoned:natural': 'spring' }),
+      node(9, { railway: 'station', 'disused:railway': 'station' }),
+      node(10, { amenity: 'restaurant', shop: 'bakery', 'disused:shop': 'bakery' }),
+    ] })
+    expect(places.map((place) => place.id)).toEqual([3, 4, 5, 6, 7, 8, 9, 10])
+    const kinds = ['restaurant', 'bakery', 'spring', 'train'] as const
+    expect(places.map((place) => placeKind(place, kinds)?.id)).toEqual([
+      undefined, undefined, undefined, 'restaurant', 'restaurant', undefined, undefined, 'restaurant',
+    ])
+    for (const tags of [{ amenity: 'restaurant', disused: 'yes' },
+      { amenity: 'restaurant', opening_hours: 'closed' }]) {
+      expect(placeKind({ type: 'node', id: 11, latitude: 50, longitude: 8, tags }, kinds)).toBeUndefined()
+    }
   })
 
   it('rejects incomplete or invalid responses rather than caching them as complete', () => {

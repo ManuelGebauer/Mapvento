@@ -1,4 +1,4 @@
-import { batchesForCells, cellForPosition, cellKey, legacyCellKey, legacyKindCellKey, type PlaceCell } from './placeCells'
+import { batchesForCells, cellForPosition, cellKey, legacyCellKey, legacyKindCellKey, legacySupermarketCellKey, type PlaceCell } from './placeCells'
 import { PLACE_KINDS, fetchPlaces, OverpassHttpError, OverpassInvalidResponseError, OverpassNetworkError, OverpassSizeError, OverpassUnavailableError, placeKind, type Bounds, type Place, type PlaceKindId, type PlacesDiagnostic } from './places'
 import { isPlacesEntryFresh, type CachedPlaces, type PlacesCache } from './placesCache'
 import { diagnosticErrorName, placesAbortReason } from './placesDiagnostics'
@@ -49,7 +49,8 @@ export async function loadPlaces(options: LoaderOptions): Promise<void> {
   const pause = options.wait ?? wait
   const keys = cells.flatMap((cell) => kinds.map((kind) => cellKey(cell, kind)))
   const legacyKeys = cells.flatMap((cell) => PLACE_KINDS.filter((kind) => kinds.includes(kind.id))
-    .flatMap((kind) => [legacyCellKey(cell, kind.category), legacyKindCellKey(cell, kind.id)]))
+    .flatMap((kind) => [legacyCellKey(cell, kind.category), legacyKindCellKey(cell, kind.id),
+      ...(kind.id === 'supermarket' ? [legacySupermarketCellKey(cell)] : [])]))
   async function cacheOperation<T>(phase: 'cache-read' | 'cache-write', count: number, operation: () => Promise<T>): Promise<T> {
     const startedAt = new Date().toISOString()
     const start = performance.now()
@@ -70,7 +71,7 @@ export async function loadPlaces(options: LoaderOptions): Promise<void> {
   const allKeys = [...new Set([...keys, ...legacyKeys])]
   const entries = await cacheOperation('cache-read', allKeys.length, () => cache.get(allKeys))
   signal.throwIfAborted()
-  // Older cache entries excluded access=customers and may be incomplete.
+  // Older entries may have excluded customer access or newly included shop types.
   const incompleteKeys = new Set<string>()
   for (const cell of cells) {
     for (const kind of PLACE_KINDS.filter((item) => kinds.includes(item.id))) {
@@ -78,7 +79,9 @@ export async function loadPlaces(options: LoaderOptions): Promise<void> {
       if (entries.has(key)) continue
       const oldCategory = entries.get(legacyCellKey(cell, kind.category))
       const oldKind = entries.get(legacyKindCellKey(cell, kind.id))
-      const legacy = oldCategory && (!oldKind || oldCategory.downloadedAt > oldKind.downloadedAt) ? oldCategory : oldKind
+      const oldSupermarket = kind.id === 'supermarket' ? entries.get(legacySupermarketCellKey(cell)) : undefined
+      const legacy = [oldCategory, oldKind, oldSupermarket].filter((entry) => entry !== undefined)
+        .sort((a, b) => b.downloadedAt - a.downloadedAt)[0]
       if (legacy) {
         entries.set(key, { key, downloadedAt: legacy.downloadedAt,
           places: legacy.places.filter((place) => Boolean(placeKind(place, [kind.id]))) })

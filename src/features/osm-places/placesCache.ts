@@ -117,7 +117,7 @@ export class PlacesCache {
     const complete = new Set<string>()
     for (const value of values) {
       if (!isRecord(value) || typeof value.key !== 'string') continue
-      const match = /^(v1:private-coffee|v2:places|v3:places):(\d+):(\d+):(\d+):([a-z-]+)$/.exec(value.key)
+      const match = /^(v1:private-coffee|v2:places|v3:places|v4:places):(\d+):(\d+):(\d+):([a-z-]+)$/.exec(value.key)
       if (!match || Number(match[2]) !== PLACES_ZOOM) continue
       const cell = cachedCell(Number(match[3]), Number(match[4]))
       if (!cell || !cellIntersectsBounds(cell, bounds)) continue
@@ -133,7 +133,7 @@ export class PlacesCache {
       }
       for (const kind of candidates) {
         const key = cellKey(cell, kind.id)
-        const current = match[1] === 'v3:places'
+        const current = value.key === key
         const previous = result.get(key)
         if (complete.has(key) || (!current && previous && previous.downloadedAt >= entry.downloadedAt)) continue
         result.set(key, { key, downloadedAt: entry.downloadedAt,

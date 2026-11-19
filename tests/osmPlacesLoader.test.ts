@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { loadPlaces, type PlacesProgress } from '../src/features/osm-places/loadPlaces'
-import { cellForPosition, cellKey, legacyCellKey, legacyKindCellKey } from '../src/features/osm-places/placeCells'
+import { cellForPosition, cellKey, legacyCellKey, legacyKindCellKey, legacySupermarketCellKey } from '../src/features/osm-places/placeCells'
 import { OverpassHttpError, OverpassSizeError, type Place } from '../src/features/osm-places/places'
 import { PLACES_MAX_AGE, type CachedPlaces } from '../src/features/osm-places/placesCache'
 import { DRESEL_EUROPE, PRIVATE_COFFEE } from '../src/features/osm-places/placesProviders'
@@ -65,6 +65,25 @@ describe('OSM place loading', () => {
       signal: new AbortController().signal, fetch, wait: immediateWait, onUpdate: (entries) => updates.push(entries) })
     expect(fetch).not.toHaveBeenCalled()
     expect(updates.at(-1)?.get(key)).toEqual(current)
+  })
+
+  it('reloads old supermarket cells while keeping their places visible', async () => {
+    const legacyKey = legacySupermarketCellKey(cell)
+    const supermarket: Place = { ...place, tags: { shop: 'supermarket' } }
+    const convenience: Place = { ...place, id: 2, tags: { shop: 'convenience' } }
+    const legacy: CachedPlaces = { key: legacyKey, downloadedAt: Date.now(), places: [supermarket] }
+    const cache = { get: vi.fn().mockResolvedValue(new Map([[legacyKey, legacy]])), put: vi.fn().mockResolvedValue(undefined) }
+    const fetch = vi.fn().mockResolvedValue([supermarket, convenience])
+    const updates: Array<{ entries: ReadonlyMap<string, CachedPlaces>; progress: PlacesProgress }> = []
+    await loadPlaces({ cells: [cell], kinds: ['supermarket'], force: false, cache,
+      signal: new AbortController().signal, fetch, wait: immediateWait,
+      onUpdate: (entries, progress) => updates.push({ entries, progress }) })
+    const newKey = cellKey(cell, 'supermarket')
+    expect(updates[0].entries.get(newKey)?.places).toEqual([supermarket])
+    expect(updates[0].progress).toMatchObject({ stale: 1, pending: 1 })
+    expect(fetch).toHaveBeenCalledOnce()
+    expect(updates.at(-1)?.entries.get(newKey)?.places).toEqual([supermarket, convenience])
+    expect(cache.put.mock.calls[0][0][0].key).toBe(newKey)
   })
 
   it('fetches a missing type even when another type in the same group is cached', async () => {

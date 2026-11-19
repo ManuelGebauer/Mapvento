@@ -1,7 +1,7 @@
 import { indexedDB } from 'fake-indexeddb'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { isPlacesEntryFresh, PLACES_MAX_AGE, PlacesCache } from '../src/features/osm-places/placesCache'
-import { cellForPosition, cellKey, legacyCellKey } from '../src/features/osm-places/placeCells'
+import { cellForPosition, cellKey, legacyCellKey, legacySupermarketCellKey } from '../src/features/osm-places/placeCells'
 
 let database = 0
 
@@ -48,6 +48,48 @@ describe('OSM places cache', () => {
     expect(entries.get(cellKey(east, 'spring'))?.places.map((place) => place.id)).toEqual([2])
     expect(entries.has(cellKey(outside, 'spring'))).toBe(false)
     expect((await cache.getVisible({ south: -90, north: 90, west: -360, east: 360 }, ['spring'])).size).toBe(3)
+  })
+
+  it('shows old supermarket cells until a complete replacement is available', async () => {
+    const cache = new PlacesCache(`places-${database++}`)
+    const cell = cellForPosition(50, 8)
+    const bounds = { south: 49, north: 51, west: 7, east: 9 }
+    const supermarket = { type: 'node' as const, id: 1, latitude: 50, longitude: 8, tags: { shop: 'supermarket' } }
+    const key = cellKey(cell, 'supermarket')
+    await cache.put([{ key: legacySupermarketCellKey(cell), downloadedAt: 20, places: [supermarket] }])
+    expect((await cache.getVisible(bounds, ['supermarket'])).get(key)?.places).toEqual([supermarket])
+    await cache.put([{ key, downloadedAt: 10, places: [] }])
+    expect((await cache.getVisible(bounds, ['supermarket'])).get(key)?.places).toEqual([])
+  })
+
+  it('filters closed and disused places when reading an existing cache entry', async () => {
+    const name = `places-${database++}`
+    const cache = new PlacesCache(name)
+    const cell = cellForPosition(50, 8)
+    const key = cellKey(cell, 'restaurant')
+    await cache.get([])
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open(name, 1)
+      request.onsuccess = () => resolve(request.result)
+      request.onerror = () => reject(request.error)
+    })
+    const place = (id: number, tags: Record<string, string>) =>
+      ({ type: 'node', id, latitude: 50, longitude: 8, tags })
+    const tx = db.transaction('places', 'readwrite')
+    tx.objectStore('places').put({ key, version: 1, downloadedAt: Date.now(), places: [
+      place(1, { amenity: 'restaurant', disused: 'yes' }),
+      place(2, { amenity: 'restaurant', opening_hours: 'closed' }),
+      place(3, { amenity: 'restaurant', 'disused:amenity': 'restaurant' }),
+      place(4, { amenity: 'restaurant', 'abandoned:amenity': 'restaurant' }),
+      place(5, { amenity: 'restaurant' }),
+    ] })
+    await new Promise<void>((resolve, reject) => {
+      tx.oncomplete = () => resolve()
+      tx.onerror = tx.onabort = () => reject(tx.error)
+    })
+    const entries = await cache.getVisible({ south: 49, north: 51, west: 7, east: 9 }, ['restaurant'])
+    expect(entries.get(key)?.places.map((item) => item.id)).toEqual([5])
+    db.close()
   })
 
   it('retains previous data when a replacement exceeds the storage limit', async () => {

@@ -80,6 +80,7 @@ export const POI_ICON_CATEGORIES = [
       osm(POI_ICON_IDS.nightclub, 'Nachtclub'),
       osm(POI_ICON_IDS.supermarket, 'Supermarkt'),
       osm(POI_ICON_IDS.bakery, 'Bäckerei'),
+      osm(POI_ICON_IDS.butcher, 'Metzgerei'),
     ],
   },
   {
