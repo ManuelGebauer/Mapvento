@@ -32,10 +32,14 @@ describe('OSM place POI preparation', () => {
       ...place,
       tags: { shop: 'bicycle', note: 'Not transferred', name: '  ' },
     }, 'poi-2')).toMatchObject({
-      name: 'OSM-Ort',
+      name: '',
       description: '',
       icon: 'flag',
     })
+    expect(createPoiDraftFromOsmPlace({
+      ...place,
+      tags: { amenity: 'restaurant' },
+    }, 'poi-3').name).toBe('')
   })
 
   it('opens the editable POI action and leaves details open if replacement is declined', async () => {

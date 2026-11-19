@@ -9,7 +9,7 @@ export function createPoiDraftFromOsmPlace(place: Place, id: string): MapPoint {
 
   return {
     id,
-    name: place.tags.name?.trim(),
+    name: place.tags.name?.trim() ?? '',
     description: place.tags.description?.trim().slice(0, 180) ?? '',
     coordinate: [place.longitude, place.latitude],
     source: 'poi',

@@ -15,8 +15,8 @@ once released versions are maintained.
   Private.coffee as fallback.
 - Show details of OpenStreetMap places in a popup window and provide quick
   acces to linked images and weblinks.
-- OSM place details can prepare an editable POI draft with an name,
-  description and icon mapping.
+- OSM place details can prepare an editable POI draft with its OSM name when
+  available (otherwise blank), description, icon, coordinates and OSM reference.
 
 ## [0.1.0] - 2026-11-12
 
