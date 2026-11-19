@@ -50,13 +50,21 @@ function osmObjectUrl(place: Place): string {
   return `https://www.openstreetmap.org/${place.type}/${place.id}`
 }
 
-export function OsmPlaceDetails({ selection, onClose }: { selection: Selection | null; onClose: () => void }) {
+export function OsmPlaceDetails({ selection, onClose, onCreatePoi }: {
+  selection: Selection | null
+  onClose: () => void
+  onCreatePoi: (place: Place, clientX: number, clientY: number) => boolean
+}) {
   if (!selection) return null
   return <OsmPlaceDetailsDialog key={`${selection.place.type}/${selection.place.id}`}
-    selection={selection} onClose={onClose} />
+    selection={selection} onClose={onClose} onCreatePoi={onCreatePoi} />
 }
 
-function OsmPlaceDetailsDialog({ selection, onClose }: { selection: Selection; onClose: () => void }) {
+function OsmPlaceDetailsDialog({ selection, onClose, onCreatePoi }: {
+  selection: Selection
+  onClose: () => void
+  onCreatePoi: (place: Place, clientX: number, clientY: number) => boolean
+}) {
   const { place, anchor } = selection
   const closeButton = useRef<HTMLButtonElement>(null)
   const dialog = useRef<HTMLElement>(null)
@@ -129,7 +137,13 @@ function OsmPlaceDetailsDialog({ selection, onClose }: { selection: Selection; o
             {place.type} {place.id}
             {' · '}{place.latitude}, {place.longitude}
           </p>
-          <p><ExternalLink url={osmObjectUrl(place)}>In OpenStreetMap öffnen</ExternalLink></p>
+          <div className="osm-place-details-links">
+            <ExternalLink url={osmObjectUrl(place)}>In OpenStreetMap öffnen</ExternalLink>
+            <button type="button" onClick={(event) => {
+              const bounds = event.currentTarget.getBoundingClientRect()
+              if (onCreatePoi(place, bounds.left + bounds.width / 2, bounds.top + bounds.height / 2)) onClose()
+            }}>Einen POI erstellen</button>
+          </div>
         </div>
         <button ref={closeButton} type="button" className="map-layer-close"
           aria-label="Ortsdetails schließen" onClick={onClose}>×</button>

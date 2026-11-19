@@ -10,21 +10,13 @@ once released versions are maintained.
 
 ### Added
 
-- Optional OpenStreetMap places, including customer-accessible places, with
-  individually selectable, grouped types, automatic bounded viewport loading
-  after type selection, a persistent
-  14-day cache, panel-only download status with a compact load control,
-  panel-aware toolbar highlighting,
-  manual refresh, Dresel Overpass for covered European
-  and North American regions, Private.coffee as fallback or worldwide provider, and
-  opt-in diagnostics for requests, cancellation causes, and cache operations
-  without recording coordinates or response text. Markers open a read-only,
-  compact, marker-anchored detail window with route-point-consistent selection
-  highlighting and exclusive route-node selection, all OSM tags, normalized
-  external links (including Wikimedia Commons file tags), and
-  user-initiated raster image previews. Public-transport shelters are excluded.
-  Service timeouts are
-  reported without assuming that the selected area is too large.
+- Optional show OpenStreetMap places (customer-accessible) with automatic
+  bounded viewport loading and 14-day cache; using Dresel Overpass and
+  Private.coffee as fallback.
+- Show details of OpenStreetMap places in a popup window and provide quick
+  acces to linked images and weblinks.
+- OSM place details can prepare an editable POI draft with an name,
+  description and icon mapping.
 
 ## [0.1.0] - 2026-11-12
 

@@ -12,7 +12,7 @@ function Harness({ map, diagnosticsEnabled = false, onPlaceSelected }: {
   onPlaceSelected?: () => void
 }) {
   const places = useOsmPlaces(map, diagnosticsEnabled, onPlaceSelected)
-  return <PlacesControl places={places} disabled={false} />
+  return <PlacesControl places={places} disabled={false} onCreatePoi={() => false} />
 }
 
 function kindInput(container: HTMLElement, label: string): HTMLInputElement {

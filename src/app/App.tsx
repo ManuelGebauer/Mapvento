@@ -43,6 +43,8 @@ import { readInitialProject } from '../domain/project'
 import { useLeafletMap } from '../integrations/map/useLeafletMap'
 import { useProjectFiles } from '../features/project-files/useProjectFiles'
 import { uid } from '../domain/uid'
+import { createPoiDraftFromOsmPlace } from '../features/osm-places/poiDraft'
+import type { Place } from '../features/osm-places/places'
 import type { ErrorBanner, NodeContextMenu, NodeSelection, ToolMode } from './appTypes'
 import { useRouteRouting } from '../features/route-routing/useRouteRouting'
 import { usePlaceSearch } from '../features/geocoding/usePlaceSearch'
@@ -279,6 +281,18 @@ function App() {
       left,
     })
   }, [])
+
+  const createPoiFromOsm = useCallback((place: Place, clientX: number, clientY: number) => {
+    if (routeEditor) {
+      setNotice('Schließe zuerst den geöffneten Routen-Editor.')
+      return false
+    }
+    if (pointEditor && !window.confirm('Ungespeicherte Eingaben im POI-Editor verwerfen und einen OSM-POI vorbereiten?')) {
+      return false
+    }
+    openPointEditor(createPoiDraftFromOsmPlace(place, uid('point')), true, clientX, clientY)
+    return true
+  }, [openPointEditor, pointEditor, routeEditor])
 
   const updateNode = useCallback((routeId: string, nodeId: string, coordinate: Coordinate) => {
     const route = project.routes.find((item) => item.id === routeId)
@@ -849,7 +863,7 @@ function App() {
             createPortal(
               <>
                 <div className="route-editor-backdrop" aria-hidden="true" />
-                <PointEditor point={pointEditor.draft} isNew={pointEditor.isNew}
+                <PointEditor key={pointEditor.pointId} point={pointEditor.draft} isNew={pointEditor.isNew}
                   top={pointEditor.top} left={pointEditor.left} poiIconPickerOpen={poiIconPickerOpen}
                   setPoiIconPickerOpen={setPoiIconPickerOpen} updatePointDraft={updatePointDraft}
                   confirmDeletePoint={confirmDeletePoint} savePointProperties={savePointProperties}
@@ -882,6 +896,7 @@ function App() {
               focusSearchResultOnMap={focusSearchResultOnMap} setSearchMessage={setSearchMessage}
               toolMode={toolMode} activateToolMode={activateToolMode} activeRoute={activeRoute}
               focusRoute={focusRoute} layerId={layerId} overlayIds={project.mapOverlayIds ?? []} osmPlaces={osmPlaces}
+              onCreatePoiFromOsm={createPoiFromOsm}
               changeLayer={(nextLayerId) => {
                 setLayerId(nextLayerId)
                 setProject((current) => ({ ...current, mapLayerId: nextLayerId }))

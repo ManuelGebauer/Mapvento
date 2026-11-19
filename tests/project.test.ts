@@ -74,6 +74,22 @@ describe('project validation', () => {
     })).toThrow('enthält ein unbekanntes POI-Symbol')
   })
 
+  it('round-trips an OSM reference and rejects malformed references', () => {
+    const referencedPoint = { ...point, osmReference: { type: 'relation', id: 987654 } }
+    expect(normalizeProject({ ...project, points: [referencedPoint] }).points[0].osmReference)
+      .toEqual(referencedPoint.osmReference)
+    for (const osmReference of [
+      null,
+      { type: 'area', id: 1 },
+      { type: 'node', id: 0 },
+      { type: 'way', id: Number.MAX_SAFE_INTEGER + 1 },
+      { type: 'node', id: '1' },
+    ]) {
+      expect(() => normalizeProject({ ...project, points: [{ ...point, osmReference }] }))
+        .toThrow('Ungültiges Projekt')
+    }
+  })
+
   it.each(layers.filter((layer) => !layer.requiresKey))('preserves the registered layer $id', ({ id }) => {
     expect(normalizeProject({ ...project, mapLayerId: id }).mapLayerId).toBe(id)
   })
