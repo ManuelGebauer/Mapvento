@@ -8,6 +8,7 @@ import { placesCache, type CachedPlaces } from './placesCache'
 import { abortPlaces, diagnosticErrorName } from './placesDiagnostics'
 
 export type PlacesControlState = {
+  selectedPlace: { place: Place; anchor: { x: number; y: number; bounds: DOMRect } } | null
   selectedKinds: PlaceKindId[]
   activeKinds: PlaceKindId[]
   progress: PlacesProgress | null
@@ -24,9 +25,11 @@ export type PlacesControlState = {
   refresh: () => void
   retry: () => void
   clear: () => Promise<void>
+  closePlaceDetails: () => void
 }
 
 type Viewport = { bounds: Bounds; loadBounds: Bounds; sequence: number }
+const noop = () => {}
 
 function viewportForMap(map: L.Map, sequence: number): Viewport {
   const bounds = map.getBounds()
@@ -44,7 +47,7 @@ function viewportForMap(map: L.Map, sequence: number): Viewport {
   }
 }
 
-export function useOsmPlaces(map: L.Map | null, diagnosticsEnabled = false): PlacesControlState {
+export function useOsmPlaces(map: L.Map | null, diagnosticsEnabled = false, onPlaceSelected: () => void = noop): PlacesControlState {
   const [selectedKinds, setSelectedKinds] = useState<PlaceKindId[]>([])
   const [activeKinds, setActiveKinds] = useState<PlaceKindId[]>([])
   const [viewport, setViewport] = useState<Viewport | null>(null)
@@ -52,12 +55,15 @@ export function useOsmPlaces(map: L.Map | null, diagnosticsEnabled = false): Pla
   const [loading, setLoading] = useState(false)
   const [moving, setMoving] = useState(false)
   const [entries, setEntries] = useState<ReadonlyMap<string, CachedPlaces>>(new Map())
+  const [selectedPlace, setSelectedPlace] = useState<PlacesControlState['selectedPlace']>(null)
   const [progress, setProgress] = useState<PlacesProgress | null>(null)
   const [error, setError] = useState('')
   const [diagnostics, setDiagnostics] = useState<PlacesDiagnostic[]>([])
   const diagnosticsEnabledRef = useRef(diagnosticsEnabled)
   const mounted = useRef(false)
   const activeRequest = useRef<AbortController | null>(null)
+  const selectedMarker = useRef<L.Marker | null>(null)
+  const selectedMarkerKey = useRef<string | null>(null)
   const [reloadSequence, setReloadSequence] = useState(0)
   const nextForce = useRef(false)
   const lastForce = useRef(false)
@@ -159,6 +165,7 @@ export function useOsmPlaces(map: L.Map | null, diagnosticsEnabled = false): Pla
     const unique = new Map<string, { place: Place; downloadedAt: number }>()
     for (const entry of entries.values()) {
       for (const place of entry.places) {
+        if (place.tags.shelter_type?.trim().toLowerCase() === 'public_transport') continue
         if (!placeKind(place, activeKinds)) continue
         const key = `${place.type}:${place.id}`
         const previous = unique.get(key)
@@ -180,10 +187,39 @@ export function useOsmPlaces(map: L.Map | null, diagnosticsEnabled = false): Pla
           iconSize: [26, 26], iconAnchor: [13, 13],
         }),
       }).addTo(markers)
-      marker.on('click', (event: L.LeafletMouseEvent) => L.DomEvent.stopPropagation(event))
+      const markerElement = marker.getElement()
+      const isSelected = selectedMarkerKey.current === `${place.type}:${place.id}`
+      marker.setZIndexOffset(isSelected ? 1000 : 0)
+      markerElement?.classList.toggle('osm-place-marker-selected', isSelected)
+      markerElement?.setAttribute('aria-pressed', String(isSelected))
+      if (isSelected) selectedMarker.current = marker
+      marker.on('click', (event: L.LeafletMouseEvent) => {
+        L.DomEvent.stopPropagation(event)
+        onPlaceSelected()
+        const previous = selectedMarker.current
+        previous?.getElement()?.classList.remove('osm-place-marker-selected')
+        previous?.getElement()?.setAttribute('aria-pressed', 'false')
+        previous?.setZIndexOffset(0)
+        selectedMarker.current = marker
+        selectedMarkerKey.current = `${place.type}:${place.id}`
+        marker.setZIndexOffset(1000)
+        marker.getElement()?.focus()
+        marker.getElement()?.classList.add('osm-place-marker-selected')
+        marker.getElement()?.setAttribute('aria-pressed', 'true')
+        const markerBounds = marker.getElement()?.getBoundingClientRect()
+        const bounds = map.getContainer().getBoundingClientRect()
+        setSelectedPlace({
+          place,
+          anchor: {
+            x: markerBounds ? markerBounds.left + markerBounds.width / 2 : event.originalEvent.clientX,
+            y: markerBounds ? markerBounds.top + markerBounds.height / 2 : event.originalEvent.clientY,
+            bounds,
+          },
+        })
+      })
     }
     return () => { markers.remove() }
-  }, [map, activeKinds, viewport, entries])
+  }, [map, activeKinds, viewport, entries, onPlaceSelected])
 
   const toggleKind = useCallback((kind: PlaceKindId, selected: boolean) => {
     if (!selected) {
@@ -261,15 +297,26 @@ export function useOsmPlaces(map: L.Map | null, diagnosticsEnabled = false): Pla
     }
   }, [recordDiagnostic])
 
+  const closePlaceDetails = useCallback(() => {
+    selectedMarker.current?.getElement()?.classList.remove('osm-place-marker-selected')
+    selectedMarker.current?.getElement()?.setAttribute('aria-pressed', 'false')
+    selectedMarker.current?.setZIndexOffset(0)
+    selectedMarker.current = null
+    selectedMarkerKey.current = null
+    setSelectedPlace(null)
+  }, [])
+
   const needsLoad = selectedKinds.some((kind) => !activeKinds.includes(kind))
   const canLoad = Boolean(needsLoad && viewport && !moving)
   const canRefresh = Boolean(!loading && !moving && activeKinds.length && viewport)
   return {
-    selectedKinds, activeKinds, progress, error, needsLoad, canLoad, canRefresh, needsRetry, diagnosticsEnabled, diagnostics,
+    selectedPlace, selectedKinds, activeKinds, progress, error, needsLoad, canLoad, canRefresh, needsRetry,
+    diagnosticsEnabled, diagnostics,
     toggleKind, toggleCategory,
     load,
     refresh: () => reload(true),
     retry: () => reload(lastForce.current),
     clear,
+    closePlaceDetails,
   }
 }

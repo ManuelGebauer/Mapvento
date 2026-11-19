@@ -6,8 +6,12 @@ import { PlacesControl } from '../src/components/map/PlacesControl'
 import { useOsmPlaces } from '../src/features/osm-places/useOsmPlaces'
 import { placesCache, type CachedPlaces } from '../src/features/osm-places/placesCache'
 
-function Harness({ map, diagnosticsEnabled = false }: { map: L.Map; diagnosticsEnabled?: boolean }) {
-  const places = useOsmPlaces(map, diagnosticsEnabled)
+function Harness({ map, diagnosticsEnabled = false, onPlaceSelected }: {
+  map: L.Map
+  diagnosticsEnabled?: boolean
+  onPlaceSelected?: () => void
+}) {
+  const places = useOsmPlaces(map, diagnosticsEnabled, onPlaceSelected)
   return <PlacesControl places={places} disabled={false} />
 }
 
@@ -560,6 +564,96 @@ describe('OSM places map interaction', () => {
       await act(async () => { await vi.advanceTimersByTimeAsync(1100) })
       expect(container.textContent).toContain('Fallback für Dresel (Europa)')
       expect(fetch).toHaveBeenCalledTimes(2)
+    } finally {
+      await act(async () => root.unmount())
+      map.remove()
+      mapElement.remove()
+      container.remove()
+    }
+  })
+
+  it('opens complete read-only place details and loads only safe image previews on request', async () => {
+    vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
+    vi.useFakeTimers()
+    vi.setSystemTime(Date.now() + 2_000_000)
+    vi.spyOn(placesCache, 'get').mockResolvedValue(new Map())
+    vi.spyOn(placesCache, 'put').mockResolvedValue()
+    const longValue = 'Langbeschreibung '.repeat(80)
+    const clearRouteNodeFocus = vi.fn()
+    const fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify({ elements: [{
+      type: 'node', id: 268390610, lat: 50, lon: 8, tags: {
+        natural: 'spring',
+        description: longValue,
+        empty: '',
+        website: 'https://example.org/place',
+        image: 'File:https://upload.wikimedia.org/wikipedia/commons/d/dc/Hasemann-H%C3%BCtte.jpg',
+        'image:1': 'https://images.example.org/place.svg',
+        wikimedia_commons: 'File:Hasemann-Hütte.jpg',
+        unsafe: 'javascript:alert(1)',
+      },
+    }] })))
+    vi.stubGlobal('fetch', fetch)
+    const mapElement = document.createElement('div')
+    Object.defineProperties(mapElement, { clientWidth: { value: 700 }, clientHeight: { value: 500 } })
+    document.body.append(mapElement)
+    const map = L.map(mapElement).setView([50, 8], 15)
+    const container = document.createElement('div')
+    document.body.append(container)
+    const root = createRoot(container)
+    try {
+      await act(async () => root.render(<Harness map={map} onPlaceSelected={clearRouteNodeFocus} />))
+      await act(async () => container.querySelector<HTMLButtonElement>('[aria-label="OSM-Orte und Filter"]')!.click())
+      await selectAndLoad(container)
+      const marker = mapElement.querySelector<HTMLElement>('.leaflet-marker-icon')
+      expect(marker).not.toBeNull()
+      vi.spyOn(map.getContainer(), 'getBoundingClientRect').mockReturnValue(new DOMRect(100, 50, 700, 500))
+      vi.spyOn(marker!, 'getBoundingClientRect').mockReturnValue(new DOMRect(180, 130, 40, 40))
+      await act(async () => marker!.click())
+      expect(clearRouteNodeFocus).toHaveBeenCalledOnce()
+
+      const dialog = document.body.querySelector<HTMLElement>('[role="dialog"]')
+      expect(dialog?.getAttribute('aria-modal')).toBe('true')
+      expect(dialog?.textContent).toContain('OSM-Ort')
+      expect(dialog?.textContent).toContain('node 268390610')
+      expect(dialog?.textContent).toContain('Kein Wert angegeben')
+      expect(dialog?.textContent).toContain(longValue)
+      expect(dialog?.querySelectorAll('tbody tr')).toHaveLength(8)
+      expect(dialog?.style.left).toBe('214px')
+      expect(dialog?.querySelector('input, textarea, [contenteditable="true"]')).toBeNull()
+      expect(marker?.classList.contains('osm-place-marker-selected')).toBe(true)
+      expect(marker?.getAttribute('aria-pressed')).toBe('true')
+
+      const website = Array.from(dialog?.querySelectorAll<HTMLAnchorElement>('a') ?? [])
+        .find((link) => link.href === 'https://example.org/place')
+      expect(website?.target).toBe('_blank')
+      expect(website?.rel).toContain('noopener')
+      expect(Array.from(dialog?.querySelectorAll('a') ?? []).some((link) =>
+        link.textContent?.includes('javascript:alert'))).toBe(false)
+      expect(dialog?.querySelector('img')).toBeNull()
+      expect(Array.from(dialog?.querySelectorAll('button') ?? []).some((button) =>
+        button.textContent === 'Bildvorschau laden')).toBe(true)
+      const wikimediaLink = Array.from(dialog?.querySelectorAll<HTMLAnchorElement>('a') ?? [])
+        .find((link) => link.textContent?.startsWith('File:https://upload.wikimedia.org'))
+      expect(wikimediaLink?.href)
+        .toBe('https://upload.wikimedia.org/wikipedia/commons/d/dc/Hasemann-H%C3%BCtte.jpg')
+      const commonsLink = Array.from(dialog?.querySelectorAll<HTMLAnchorElement>('a') ?? [])
+        .find((link) => link.textContent === 'File:Hasemann-Hütte.jpg')
+      expect(commonsLink?.href).toBe('https://commons.wikimedia.org/wiki/File:Hasemann-H%C3%BCtte.jpg')
+
+      const imageRow = Array.from(dialog?.querySelectorAll<HTMLTableRowElement>('tbody tr') ?? [])
+        .find((row) => row.querySelector('th')?.textContent === 'image')
+      await act(async () => button(imageRow!, 'Bildvorschau laden').click())
+      const preview = dialog?.querySelector<HTMLImageElement>('img')
+      expect(preview?.getAttribute('src'))
+        .toBe('https://upload.wikimedia.org/wikipedia/commons/d/dc/Hasemann-H%C3%BCtte.jpg')
+      expect(preview?.getAttribute('referrerpolicy')).toBe('strict-origin-when-cross-origin')
+      await act(async () => preview?.dispatchEvent(new Event('error')))
+      expect(dialog?.textContent).toContain('Bildvorschau konnte nicht geladen werden.')
+      await act(async () => dialog!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))
+      expect(document.body.querySelector('[role="dialog"]')).toBeNull()
+      expect(marker?.classList.contains('osm-place-marker-selected')).toBe(false)
+      expect(marker?.getAttribute('aria-pressed')).toBe('false')
+      expect(document.activeElement).toBe(marker)
     } finally {
       await act(async () => root.unmount())
       map.remove()

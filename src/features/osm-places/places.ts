@@ -94,9 +94,11 @@ export function parsePlaces(value: unknown): Place[] {
       Object.defineProperty(tags, key, { value: tag, enumerable: true, writable: true, configurable: true })
     }
     return { type: element.type, id: element.id, latitude: position.lat, longitude: position.lon, tags }
-  }).filter((place: Place) => ![
-    'private', 'no', 'permit', 'restricted', 'military', 'agricultural', 'forestry',
-  ].includes(place.tags.access?.trim().toLowerCase() ?? ''))
+  }).filter((place: Place) =>
+    ![
+      'private', 'no', 'permit', 'restricted', 'military', 'agricultural', 'forestry',
+    ].includes(place.tags.access?.trim().toLowerCase() ?? '') &&
+    place.tags.shelter_type?.trim().toLowerCase() !== 'public_transport')
 }
 
 export function buildPlacesQuery(bounds: Bounds, kinds: readonly PlaceKindId[]): string {
@@ -108,7 +110,7 @@ export function buildPlacesQuery(bounds: Bounds, kinds: readonly PlaceKindId[]):
   }
   const bbox = `${bounds.south},${bounds.west},${bounds.north},${bounds.east}`
   const selectors = PLACE_KINDS.filter((kind) => kinds.includes(kind.id))
-    .map((kind) => `nwr["${kind.key}"="${kind.value}"](${bbox});`).join('')
+    .map((kind) => `nwr["${kind.key}"="${kind.value}"]["shelter_type"!="public_transport"](${bbox});`).join('')
   return `[out:json][timeout:25];(${selectors});out center;`
 }
 
