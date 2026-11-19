@@ -369,6 +369,118 @@
   height: 18px;
 }
 
+.osm-place-marker-wrapper.osm-place-marker-selected .osm-place-marker {
+  transform: scale(1.12);
+}
+
+.osm-place-details-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  background: transparent;
+}
+
+.osm-place-details {
+  position: fixed;
+  display: flex;
+  flex-direction: column;
+  width: min(360px, calc(100vw - 24px));
+  max-height: min(70vh, 420px);
+  overflow: hidden;
+  border: 1px solid rgba(38, 52, 59, 0.24);
+  border-radius: 8px;
+  color: #26343b;
+  background: #fff;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.28);
+}
+
+.osm-place-details-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 10px 6px;
+  border-bottom: 1px solid rgba(38, 52, 59, 0.16);
+}
+
+.osm-place-details-header h2,
+.osm-place-details-header p {
+  margin: 0 0 3px;
+  overflow-wrap: anywhere;
+}
+
+.osm-place-details-header h2 {
+  font-size: 15px;
+}
+
+.osm-place-details-header p {
+  font-size: 11px;
+}
+
+.osm-place-details-content {
+  min-height: 0;
+  padding: 5px 10px 8px;
+  overflow: auto;
+  font-size: 11px;
+}
+
+.osm-place-details-content h3 {
+  margin: 3px 0 5px;
+  font-size: 12px;
+}
+
+.osm-place-details-content table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  text-align: left;
+}
+
+.osm-place-details-content th,
+.osm-place-details-content td {
+  padding: 4px 6px;
+  border-bottom: 1px solid rgba(38, 52, 59, 0.12);
+  vertical-align: top;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.osm-place-details-content th {
+  width: 34%;
+}
+
+.osm-place-details-content thead th {
+  font-size: 12px;
+}
+
+.osm-place-details-content a {
+  overflow-wrap: anywhere;
+}
+
+.osm-place-missing-value,
+.osm-place-image-error {
+  color: #52636b;
+}
+
+.osm-place-image-load {
+  display: block;
+  margin-top: 6px;
+}
+
+.osm-place-image-preview {
+  display: block;
+  max-width: min(100%, 360px);
+  max-height: 240px;
+  margin-top: 8px;
+  object-fit: contain;
+}
+
+.osm-place-details button:focus-visible,
+.osm-place-details a:focus-visible {
+  outline: 2px solid #315a44;
+  outline-offset: 2px;
+}
+
 .map-layer-panel {
   position: absolute;
   top: 0;
@@ -840,6 +952,7 @@
 }
 
 .route-node.selected,
+.osm-place-marker-wrapper.osm-place-marker-selected .osm-place-marker,
 .leaflet-marker-icon:focus-visible .route-node {
   outline: 2px solid #f3a64a;
   outline-offset: 3px;

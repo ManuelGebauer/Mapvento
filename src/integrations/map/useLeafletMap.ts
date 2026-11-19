@@ -45,7 +45,6 @@ export function useLeafletMap({
   const mapContainer = useRef<HTMLDivElement>(null)
   const mapRef = useRef<L.Map | null>(null)
   const [mapInstance, setMapInstance] = useState<L.Map | null>(null)
-  const osmPlaces = useOsmPlaces(mapInstance, placesDiagnostics)
   const initialView = useRef(start)
   const searchLayerRef = useRef<L.Layer | null>(null)
   const [mapScale, setMapScale] = useState({ zoom: 7, latitude: 51.1657 })
@@ -78,6 +77,8 @@ export function useLeafletMap({
     setNotice,
     openPointEditor,
   })
+
+  const osmPlaces = useOsmPlaces(mapInstance, placesDiagnostics, clearRouteNodeFocus)
 
   useMapPointLayers({
     map: mapInstance,

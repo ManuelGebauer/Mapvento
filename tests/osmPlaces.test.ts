@@ -6,8 +6,9 @@ describe('OSM places provider', () => {
   afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals() })
   it('queries only the selected types within the requested bounds', () => {
     const query = buildPlacesQuery({ south: 50, west: 8, north: 51, east: 9 }, ['spring', 'supermarket'])
-    expect(query).toContain('nwr["natural"="spring"](50,8,51,9)')
-    expect(query).toContain('nwr["shop"="supermarket"](50,8,51,9)')
+    expect(query).toContain('nwr["natural"="spring"]["shelter_type"!="public_transport"](50,8,51,9)')
+    expect(query).toContain('nwr["shop"="supermarket"]["shelter_type"!="public_transport"](50,8,51,9)')
+    expect(query).toContain('["shelter_type"!="public_transport"]')
     expect(query).not.toContain('drinking_water')
     expect(query).not.toContain('restaurant')
     expect(query).not.toContain('nwr["amenity"="parking"]')
@@ -21,6 +22,7 @@ describe('OSM places provider', () => {
       { type: 'node', id: 2, lat: 50, lon: 8, tags: { amenity: 'parking', access: 'private' } },
       { type: 'node', id: 3, lat: 50, lon: 8, tags: { amenity: 'restaurant', access: 'customers' } },
       { type: 'node', id: 4, lat: 50, lon: 8, tags: { amenity: 'restaurant', access: '  Customers  ' } },
+      { type: 'node', id: 5, lat: 50, lon: 8, tags: { amenity: 'shelter', shelter_type: 'public_transport' } },
     ] })
     expect(places.map((place) => place.id)).toEqual([1, 1, 3, 4])
     expect(places[0].tags.name).toBe('Quelle')

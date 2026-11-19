@@ -18,8 +18,13 @@ once released versions are maintained.
   manual refresh, Dresel Overpass for covered European
   and North American regions, Private.coffee as fallback or worldwide provider, and
   opt-in diagnostics for requests, cancellation causes, and cache operations
-  without recording coordinates or response text. Service timeouts are reported without assuming
-  that the selected area is too large.
+  without recording coordinates or response text. Markers open a read-only,
+  compact, marker-anchored detail window with route-point-consistent selection
+  highlighting and exclusive route-node selection, all OSM tags, normalized
+  external links (including Wikimedia Commons file tags), and
+  user-initiated raster image previews. Public-transport shelters are excluded.
+  Service timeouts are
+  reported without assuming that the selected area is too large.
 
 ## [0.1.0] - 2026-11-12
 

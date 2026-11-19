@@ -10,6 +10,7 @@ import { version } from '../../../package.json'
 import { formatAppVersion } from '../../integrations/desktop/appVersion'
 import type { PlacesDiagnostic } from '../../features/osm-places/placesDiagnostics'
 import { getPoiIcon, poiIconSvg } from '../../integrations/map/poiIcons'
+import { OsmPlaceDetails } from './OsmPlaceDetails'
 
 const abortLabels: Record<NonNullable<PlacesDiagnostic['abortReason']>, string> = {
   'map-movement': 'Kartenbewegung oder Zoom',
@@ -178,5 +179,6 @@ export function PlacesControl({ places, disabled }: { places: PlacesControlState
         </p>
       </div>
     </section>}
+    <OsmPlaceDetails selection={places.selectedPlace} onClose={places.closePlaceDetails} />
   </div>
 }
