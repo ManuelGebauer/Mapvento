@@ -74,7 +74,58 @@ describe('OSM places map interaction', () => {
       await act(async () => container.querySelector<HTMLButtonElement>('[aria-label="Wasser: alle abwählen"]')!.click())
       expect(kindInput(container, 'Wasserquellen').checked).toBe(false)
       expect(kindInput(container, 'Trinkwasser').checked).toBe(false)
+      await act(async () => kindInput(container, 'Bäckereien').click())
+      expect(kindInput(container, 'Bäckereien').checked).toBe(true)
+      expect(kindInput(container, 'Metzgereien').checked).toBe(false)
+      expect(kindInput(container, 'Supermärkte').checked).toBe(false)
+      await act(async () => kindInput(container, 'Metzgereien').click())
+      expect(kindInput(container, 'Metzgereien').checked).toBe(true)
       expect(fetch).not.toHaveBeenCalled()
+    } finally {
+      await act(async () => root.unmount())
+      map.remove()
+      mapElement.remove()
+      container.remove()
+    }
+  })
+
+  it('loads the selected food shops with their matching marker symbols', async () => {
+    vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
+    vi.useFakeTimers()
+    vi.spyOn(placesCache, 'get').mockResolvedValue(new Map())
+    vi.spyOn(placesCache, 'put').mockResolvedValue(undefined)
+    const fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify({ elements: [
+      { type: 'node', id: 1, lat: 50, lon: 8, tags: { shop: 'convenience', name: 'Laden' } },
+      { type: 'node', id: 2, lat: 50, lon: 8, tags: { shop: 'bakery', name: 'Brot' } },
+      { type: 'node', id: 3, lat: 50, lon: 8, tags: { shop: 'butcher', name: 'Fleisch' } },
+      { type: 'node', id: 4, lat: 50, lon: 8, tags: { shop: 'bakery', disused: 'yes', name: 'Stillgelegt' } },
+      { type: 'node', id: 5, lat: 50, lon: 8, tags: { shop: 'bakery', opening_hours: 'closed', name: 'Geschlossen' } },
+      { type: 'node', id: 6, lat: 50, lon: 8, tags: { shop: 'butcher', 'abandoned:shop': 'butcher', name: 'Verlassen' } },
+    ] })))
+    vi.stubGlobal('fetch', fetch)
+    const mapElement = document.createElement('div')
+    Object.defineProperties(mapElement, { clientWidth: { value: 700 }, clientHeight: { value: 500 } })
+    document.body.append(mapElement)
+    const map = L.map(mapElement).setView([50, 8], 15)
+    const container = document.createElement('div')
+    document.body.append(container)
+    const root = createRoot(container)
+    try {
+      await act(async () => root.render(<Harness map={map} />))
+      await act(async () => container.querySelector<HTMLButtonElement>('[aria-label="OSM-Orte und Filter"]')!.click())
+      for (const label of ['Supermärkte', 'Bäckereien', 'Metzgereien']) {
+        await act(async () => kindInput(container, label).click())
+      }
+      await act(async () => { await vi.advanceTimersByTimeAsync(700) })
+      await act(async () => button(container, 'Orte laden').click())
+      await act(async () => { await vi.advanceTimersByTimeAsync(1100) })
+      expect(mapElement.querySelector('[title="Supermarkt: Laden"] svg')).not.toBeNull()
+      expect(mapElement.querySelector('[title="Bäckerei: Brot"] svg')).not.toBeNull()
+      expect(mapElement.querySelector('[title="Metzgerei: Fleisch"] svg')).not.toBeNull()
+      expect(mapElement.querySelectorAll('.osm-place-marker')).toHaveLength(3)
+      await act(async () => kindInput(container, 'Metzgereien').click())
+      expect(mapElement.querySelector('[title="Metzgerei: Fleisch"]')).toBeNull()
+      expect(mapElement.querySelector('[title="Bäckerei: Brot"]')).not.toBeNull()
     } finally {
       await act(async () => root.unmount())
       map.remove()

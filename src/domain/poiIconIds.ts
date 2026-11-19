@@ -27,6 +27,7 @@ export const POI_ICON_IDS = {
   nightclub: 'nightclub',
   supermarket: 'supermarket',
   bakery: 'bakery',
+  butcher: 'butcher',
   toilet: 'toilet',
   shower: 'shower',
   atm: 'atm',

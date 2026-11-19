@@ -72,7 +72,11 @@ export function legacyKindCellKey(cell: PlaceCell, kind: PlaceKindId): string {
 }
 
 export function cellKey(cell: PlaceCell, kind: PlaceKindId): string {
-  return `v3:places:${PLACES_ZOOM}:${cell.x}:${cell.y}:${kind}`
+  return `${kind === 'supermarket' ? 'v4' : 'v3'}:places:${PLACES_ZOOM}:${cell.x}:${cell.y}:${kind}`
+}
+
+export function legacySupermarketCellKey(cell: PlaceCell): string {
+  return `v3:places:${PLACES_ZOOM}:${cell.x}:${cell.y}:supermarket`
 }
 
 export function batchesForCells(cells: readonly PlaceCell[], kinds: readonly PlaceKindId[],

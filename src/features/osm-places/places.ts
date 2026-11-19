@@ -55,7 +55,9 @@ export const PLACE_KINDS = [
   { id: 'museum', label: 'Museen', category: 'info', key: 'tourism', value: 'museum', icon: POI_ICON_IDS.museum },
   { id: 'restaurant', label: 'Restaurants', category: 'food', key: 'amenity', value: 'restaurant', icon: POI_ICON_IDS.restaurant },
   { id: 'cafe', label: 'Cafés', category: 'food', key: 'amenity', value: 'cafe', icon: POI_ICON_IDS.cafe },
-  { id: 'supermarket', label: 'Supermärkte', category: 'food', key: 'shop', value: 'supermarket', icon: POI_ICON_IDS.supermarket },
+  { id: 'supermarket', label: 'Supermärkte', category: 'food', key: 'shop', value: 'supermarket', additionalValues: ['convenience', 'variety_store', 'general', 'food'], icon: POI_ICON_IDS.supermarket },
+  { id: 'bakery', label: 'Bäckereien', category: 'food', key: 'shop', value: 'bakery', icon: POI_ICON_IDS.bakery },
+  { id: 'butcher', label: 'Metzgereien', category: 'food', key: 'shop', value: 'butcher', icon: POI_ICON_IDS.butcher },
   { id: 'toilet', label: 'Toiletten', category: 'service', key: 'amenity', value: 'toilets', icon: POI_ICON_IDS.toilet },
   { id: 'shower', label: 'Duschen', category: 'service', key: 'amenity', value: 'shower', icon: POI_ICON_IDS.shower },
   { id: 'atm', label: 'Geldautomaten', category: 'service', key: 'amenity', value: 'atm', icon: POI_ICON_IDS.atm },
@@ -64,12 +66,23 @@ export const PLACE_KINDS = [
   { id: 'bus-stop', label: 'Bushaltestellen', category: 'transport', key: 'highway', value: 'bus_stop', icon: POI_ICON_IDS.bus },
   { id: 'bus-station', label: 'Busbahnhöfe', category: 'transport', key: 'amenity', value: 'bus_station', icon: POI_ICON_IDS.bus },
   { id: 'ferry', label: 'Fähranleger', category: 'transport', key: 'amenity', value: 'ferry_terminal', icon: POI_ICON_IDS.ferry },
-] as const satisfies readonly { id: string; label: string; category: PlaceCategory; key: string; value: string; icon: PoiIconId }[]
+] as const satisfies readonly { id: string; label: string; category: PlaceCategory; key: string; value: string; additionalValues?: readonly string[]; icon: PoiIconId }[]
 
 export type PlaceKindId = typeof PLACE_KINDS[number]['id']
 
+function kindValues(kind: typeof PLACE_KINDS[number]): readonly string[] {
+  return 'additionalValues' in kind ? [kind.value, ...kind.additionalValues] : [kind.value]
+}
+
+function isClosed(place: Place): boolean {
+  return place.tags.disused?.trim().toLowerCase() === 'yes' ||
+    place.tags.opening_hours?.trim().toLowerCase() === 'closed'
+}
+
 export function placeKind(place: Place, kinds: readonly PlaceKindId[]): typeof PLACE_KINDS[number] | undefined {
-  return PLACE_KINDS.find((kind) => kinds.includes(kind.id) && place.tags[kind.key] === kind.value)
+  if (isClosed(place)) return undefined
+  return PLACE_KINDS.find((kind) => kinds.includes(kind.id) && kindValues(kind).includes(place.tags[kind.key]) &&
+    !Object.hasOwn(place.tags, `disused:${kind.key}`) && !Object.hasOwn(place.tags, `abandoned:${kind.key}`))
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -98,7 +111,7 @@ export function parsePlaces(value: unknown): Place[] {
     ![
       'private', 'no', 'permit', 'restricted', 'military', 'agricultural', 'forestry',
     ].includes(place.tags.access?.trim().toLowerCase() ?? '') &&
-    place.tags.shelter_type?.trim().toLowerCase() !== 'public_transport')
+    place.tags.shelter_type?.trim().toLowerCase() !== 'public_transport' && !isClosed(place))
 }
 
 export function buildPlacesQuery(bounds: Bounds, kinds: readonly PlaceKindId[]): string {
@@ -110,7 +123,8 @@ export function buildPlacesQuery(bounds: Bounds, kinds: readonly PlaceKindId[]):
   }
   const bbox = `${bounds.south},${bounds.west},${bounds.north},${bounds.east}`
   const selectors = PLACE_KINDS.filter((kind) => kinds.includes(kind.id))
-    .map((kind) => `nwr["${kind.key}"="${kind.value}"]["shelter_type"!="public_transport"](${bbox});`).join('')
+    .flatMap((kind) => kindValues(kind).map((value) =>
+      `nwr["${kind.key}"="${value}"]["shelter_type"!="public_transport"](${bbox});`)).join('')
   return `[out:json][timeout:25];(${selectors});out center;`
 }
 
