@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import App from '../src/app/App'
 import { initialProject } from '../src/domain/project'
+import { importStoredProject } from './projectTestHelpers'
 
 describe('routing and route properties in the app', () => {
   afterEach(() => {
@@ -43,6 +44,7 @@ describe('routing and route properties in the app', () => {
 
       try {
         await act(async () => root.render(<App />))
+        await importStoredProject(container)
         expect(fetchMock).toHaveBeenCalledOnce()
         expect(container.textContent).toContain('Route wird berechnet')
 
@@ -111,6 +113,7 @@ describe('routing and route properties in the app', () => {
 
     try {
       await act(async () => root.render(<App />))
+      await importStoredProject(container)
       expect(requests).toHaveLength(2)
       await act(async () => requests[0].reject(new TypeError('network')))
       expect(container.textContent).toContain('Routing fehlgeschlagen')

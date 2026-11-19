@@ -32,12 +32,17 @@ export type DeveloperSettings = {
   placesDiagnostics: boolean
 }
 
-export type Settings = { version: 1; start: StartSettings; units: Units; developer: DeveloperSettings }
+export type GeneralSettings = {
+  checkForUpdates: boolean
+}
+
+export type Settings = { version: 1; start: StartSettings; units: Units; general: GeneralSettings; developer: DeveloperSettings }
 
 export const DEFAULT_SETTINGS: Settings = {
   version: 1,
   start: { layerId: DEFAULT_LAYER_ID, overlayIds: [], latitude: 51.1657, longitude: 10.4515, zoom: 7 },
   units: { distance: 'km', elevation: 'm', duration: 'hours-minutes' },
+  general: { checkForUpdates: !import.meta.env.DEV },
   developer: { cacheDiagnostics: false, placesDiagnostics: false },
 }
 
@@ -48,11 +53,13 @@ export function parseSettings(value: unknown): Settings {
   const data = value as Record<string, unknown>
   if (data.version !== 1 || typeof data.start !== 'object' || data.start === null ||
       Array.isArray(data.start) || typeof data.units !== 'object' || data.units === null || Array.isArray(data.units) ||
+      (data.general !== undefined && (typeof data.general !== 'object' || data.general === null || Array.isArray(data.general))) ||
       (data.developer !== undefined && (typeof data.developer !== 'object' || data.developer === null || Array.isArray(data.developer)))) {
     throw new Error('Einstellungen haben ein ungültiges Format oder eine unbekannte Version.')
   }
   const start = data.start as Record<string, unknown>
   const units = data.units as Record<string, unknown>
+  const general = data.general === undefined ? {} : data.general as Record<string, unknown>
   const developer = data.developer === undefined ? {} : data.developer as Record<string, unknown>
   if (typeof start.layerId !== 'string' || !isPersistableLayerId(start.layerId) ||
       !Array.isArray(start.overlayIds) || !start.overlayIds.every((id: unknown) => typeof id === 'string' && isPersistableOverlayId(id)) ||
@@ -63,6 +70,7 @@ export function parseSettings(value: unknown): Settings {
       (units.distance !== 'km' && units.distance !== 'mi') ||
       (units.elevation !== 'm' && units.elevation !== 'ft') ||
       !isDurationFormat(units.duration) ||
+      (general.checkForUpdates !== undefined && typeof general.checkForUpdates !== 'boolean') ||
       (developer.cacheDiagnostics !== undefined && typeof developer.cacheDiagnostics !== 'boolean') ||
       (developer.placesDiagnostics !== undefined && typeof developer.placesDiagnostics !== 'boolean')) {
     throw new Error('Einstellungen enthalten ungültige Werte.')
@@ -71,6 +79,7 @@ export function parseSettings(value: unknown): Settings {
     version: 1,
     start: { layerId: start.layerId, overlayIds: [...start.overlayIds], latitude: start.latitude, longitude: start.longitude, zoom: start.zoom },
     units: { distance: units.distance, elevation: units.elevation, duration: units.duration },
+    general: { checkForUpdates: general.checkForUpdates === undefined ? DEFAULT_SETTINGS.general.checkForUpdates : general.checkForUpdates },
     developer: { cacheDiagnostics: developer.cacheDiagnostics === true, placesDiagnostics: developer.placesDiagnostics === true },
   }
 }

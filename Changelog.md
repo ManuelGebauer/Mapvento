@@ -10,6 +10,8 @@ once released versions are maintained.
 
 ### Added
 
+- Check for newer GitHub releases at startup and offer the latest download.
+- Start every launch with a new, empty project instead of restoring the last one.
 - Optional show OpenStreetMap places (customer-accessible) with automatic
   bounded viewport loading and 14-day cache; using Dresel Overpass and
   Private.coffee as fallback. Selectable types include bakeries, butchers and

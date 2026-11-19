@@ -6,6 +6,7 @@ import App from '../src/app/App'
 import { initialProject } from '../src/domain/project'
 import { tileCache } from '../src/integrations/map/tileCache'
 import { placesCache } from '../src/features/osm-places/placesCache'
+import { importStoredProject } from './projectTestHelpers'
 
 function button(container: ParentNode, label: string) {
   const result = container.querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`)
@@ -229,6 +230,7 @@ describe('application interactions', () => {
     const root = createRoot(container)
     try {
       await act(async () => root.render(<App />))
+      await importStoredProject(container)
       await act(async () => button(container, 'Höhenprofil ausklappen: Interaktives Profil mit Höhen- und Distanzanalyse öffnen').click())
       const marker = () => container.querySelector<HTMLElement>('.route-node.end')!.closest<HTMLElement>('.leaflet-marker-icon')!
       const clickMarker = async () => {
@@ -274,6 +276,7 @@ describe('application interactions', () => {
     const root = createRoot(container)
     try {
       await act(async () => root.render(<App />))
+      await importStoredProject(container)
       const map = mapSpy.mock.results[0].value
       let line: L.Polyline | undefined
       map.eachLayer((layer: L.Layer) => {
@@ -325,6 +328,7 @@ describe('application interactions', () => {
     const root = createRoot(container)
     try {
       await act(async () => root.render(<App />))
+      await importStoredProject(container)
       const map = mapSpy.mock.results[0].value
       const focusEndNode = async () => {
         const node = container.querySelector<HTMLElement>('.route-node.end')!
@@ -393,6 +397,7 @@ describe('application interactions', () => {
     const root = createRoot(container)
     try {
       await act(async () => root.render(<App />))
+      await importStoredProject(container)
       const map = mapSpy.mock.results[0].value
       let line: L.Polyline | undefined
       map.eachLayer((layer: L.Layer) => {
@@ -458,6 +463,7 @@ describe('application interactions', () => {
     const root = createRoot(container)
     try {
       await act(async () => root.render(<App />))
+      await importStoredProject(container)
       const map = mapSpy.mock.results[0].value
       vi.spyOn(map.getContainer(), 'getBoundingClientRect').mockReturnValue({
         left: 0, top: 0, right: 500, bottom: 500, width: 500, height: 500, x: 0, y: 0,
@@ -539,6 +545,7 @@ describe('application interactions', () => {
     const root = createRoot(container)
     try {
       await act(async () => root.render(<App />))
+      await importStoredProject(container)
       const map = mapSpy.mock.results[0].value
       let line: L.Polyline | undefined
       map.eachLayer((layer: L.Layer) => {
@@ -575,6 +582,7 @@ describe('application interactions', () => {
     const root = createRoot(container)
     try {
       await act(async () => root.render(<App />))
+      await importStoredProject(container)
       const map = mapSpy.mock.results[0].value
       let line: L.Polyline | undefined
       map.eachLayer((layer: L.Layer) => {
@@ -626,6 +634,7 @@ describe('application interactions', () => {
     let unmounted = false
     try {
       await act(async () => root.render(<App />))
+      await importStoredProject(container)
       const map = mapSpy.mock.results[0].value
       let line: L.Polyline | undefined
       map.eachLayer((layer: L.Layer) => {
@@ -676,6 +685,7 @@ describe('application interactions', () => {
     const root = createRoot(container)
     try {
       await act(async () => root.render(<App />))
+      await importStoredProject(container)
       const map = mapSpy.mock.results[0].value
       vi.spyOn(map.getContainer(), 'getBoundingClientRect').mockReturnValue({
         left: 0, top: 0, right: 200, bottom: 200, width: 200, height: 200, x: 0, y: 0,
@@ -954,9 +964,10 @@ describe('application interactions', () => {
     const root = createRoot(container)
     try {
       await act(async () => root.render(<App />))
-      expect(tiles.mock.calls[0][0]).toContain('opentopomap.org')
+      await importStoredProject(container)
+      expect(tiles.mock.calls.at(-1)?.[0]).toContain('opentopomap.org')
       const map = mapSpy.mock.results[0].value
-      const initialTiles = tiles.mock.results[0].value
+      const initialTiles = tiles.mock.results.at(-1)!.value
       expect(map.hasLayer(initialTiles)).toBe(true)
       await act(async () => button(container, 'Kartenlayer auswählen').click())
       const osm = container.querySelector<HTMLInputElement>('input[value="osm"]')!
@@ -973,7 +984,7 @@ describe('application interactions', () => {
       const retry = container.querySelector<HTMLButtonElement>('.status-banner-action')!
       await act(async () => retry.click())
       expect(container.textContent).not.toContain('Kartenlayer nicht erreichbar')
-      expect(tiles).toHaveBeenCalledTimes(3)
+      expect(tiles).toHaveBeenCalledTimes(4)
       await act(async () => currentTiles.fire('tileerror'))
       expect(container.textContent).not.toContain('Kartenlayer nicht erreichbar')
     } finally {
@@ -1006,7 +1017,7 @@ describe('application interactions', () => {
     }
   })
 
-  it('combines, saves and restores overlays independently with per-layer error handling', async () => {
+  it('combines and saves overlays, restoring them only when opened, with per-layer error handling', async () => {
     vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
     const tiles = vi.spyOn(L, 'tileLayer')
     const mapSpy = vi.spyOn(L, 'map')
@@ -1081,6 +1092,7 @@ describe('application interactions', () => {
       const restored = createRoot(container)
       try {
         await act(async () => restored.render(<App />))
+        await importStoredProject(container)
         await act(async () => button(container, 'Kartenlayer auswählen').click())
         expect(Array.from(container.querySelectorAll<HTMLInputElement>('.map-layer-panel input[type="checkbox"]'))
           .map((input) => input.checked)).toEqual([true, true])
@@ -1233,6 +1245,7 @@ describe('application interactions', () => {
     const root = createRoot(container)
     try {
       await act(async () => root.render(<App />))
+      await importStoredProject(container)
       await act(async () => button(container, 'Höhenprofil ausklappen: Interaktives Profil mit Höhen- und Distanzanalyse öffnen').click())
       const chart = container.querySelector<SVGElement>('.elevation-chart')!
       vi.spyOn(chart, 'getBoundingClientRect').mockReturnValue({

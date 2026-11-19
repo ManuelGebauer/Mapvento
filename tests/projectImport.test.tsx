@@ -11,7 +11,7 @@ describe('project loading in the app', () => {
     vi.unstubAllGlobals()
   })
 
-  it('recovers from invalid storage and reports a rejected file without replacing the project', async () => {
+  it('rejects invalid project files without replacing the new project', async () => {
     vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
     vi.spyOn(console, 'warn').mockImplementation(() => {})
     const invalid = JSON.stringify({ ...initialProject, routes: ['broken'] })
@@ -56,7 +56,7 @@ describe('project loading in the app', () => {
     }
   })
 
-  it('reports an unavailable layer when restoring and opening a project', async () => {
+  it('starts with a new project and reports unavailable layers when opening a project', async () => {
     vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
     vi.spyOn(console, 'warn').mockImplementation(() => {})
     const saved = {
@@ -72,10 +72,10 @@ describe('project loading in the app', () => {
     try {
       await act(async () => root.render(<App />))
       const title = container.querySelector<HTMLElement>('[aria-label="Projektname"]')
-      expect(title?.textContent).toBe(saved.name)
+      expect(title?.textContent).toBe(initialProject.name)
       await act(async () => container.querySelector<HTMLButtonElement>('[aria-label="Kartenlayer auswählen"]')!.click())
       expect(container.querySelector<HTMLInputElement>('input[value="osm"]')?.checked).toBe(true)
-      expect(container.textContent).toContain('Der gespeicherte Kartenlayer ist nicht verfügbar.')
+      expect(container.textContent).not.toContain('Der gespeicherte Kartenlayer ist nicht verfügbar.')
 
       const input = container.querySelector<HTMLInputElement>('input[accept=".json,.mapvento.json"]')!
       const opened = { ...saved, name: 'Geöffnete Tour' }
