@@ -52,7 +52,13 @@ export function UpdateDialog({
       >
         <h2 id="update-title">Software-Update</h2>
         <p>Eine neue Version von Mapvento ist verfügbar.</p>
-        <p>Gestartete Version {currentVersion}<br />Verfügbare Version {availableVersion}</p>
+        <div className="version-info">
+          <span>Gestartete Version</span>
+          <span>{currentVersion}</span>
+
+          <span>Verfügbare Version</span>
+          <span>{availableVersion}</span>
+        </div>
         <footer>
           <button type="button" onClick={onClose}>Schließen</button>
           <button type="button" className="update-download" onClick={() => { void openExternalUrl(LATEST_RELEASE_URL) }}>Zum Download</button>
