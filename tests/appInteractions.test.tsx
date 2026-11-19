@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import App from '../src/app/App'
 import { initialProject } from '../src/domain/project'
 import { tileCache } from '../src/integrations/map/tileCache'
+import { placesCache } from '../src/features/osm-places/placesCache'
 
 function button(container: ParentNode, label: string) {
   const result = container.querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`)
@@ -31,6 +32,7 @@ async function changeText(input: HTMLInputElement | HTMLTextAreaElement, value: 
 
 describe('application interactions', () => {
   afterEach(() => {
+    vi.useRealTimers()
     localStorage.clear()
     vi.restoreAllMocks()
     vi.unstubAllGlobals()
@@ -66,6 +68,101 @@ describe('application interactions', () => {
       await act(async () => button(document, 'POI-Eigenschaften übernehmen').click())
       expect(container.querySelectorAll('.point-marker')).toHaveLength(1)
       expect(container.textContent).toContain('POI angelegt.')
+    } finally {
+      await act(async () => root.unmount())
+      container.remove()
+    }
+  })
+
+  it('prepares an OSM POI draft without saving until the user accepts it', async () => {
+    vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
+    vi.useFakeTimers()
+    vi.spyOn(placesCache, 'getVisible').mockResolvedValue(new Map())
+    vi.spyOn(placesCache, 'get').mockResolvedValue(new Map())
+    vi.spyOn(placesCache, 'put').mockResolvedValue()
+    let placePosition = { latitude: 51.1657, longitude: 10.4515 }
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(async () => new Response(JSON.stringify({ elements: [
+      { type: 'node', id: 501, lat: placePosition.latitude, lon: placePosition.longitude, tags: {
+        amenity: 'restaurant', name: 'Waldschänke', description: 'Kleine Gaststätte', cuisine: 'regional',
+      } },
+    ] }))))
+    const mapSpy = vi.spyOn(L, 'map')
+    const container = document.createElement('div')
+    document.body.append(container)
+    const root = createRoot(container)
+    try {
+      await act(async () => root.render(<App />))
+      const map = mapSpy.mock.results[0].value
+      Object.defineProperties(map.getContainer(), {
+        clientWidth: { configurable: true, value: 700 },
+        clientHeight: { configurable: true, value: 500 },
+      })
+      await act(async () => map.invalidateSize({ pan: false }))
+      await act(async () => { await vi.advanceTimersByTimeAsync(700) })
+      const center = map.getCenter()
+      placePosition = { latitude: center.lat, longitude: center.lng }
+      await act(async () => button(container, 'OSM-Orte und Filter').click())
+      const restaurantOption = Array.from(container.querySelectorAll<HTMLLabelElement>('.osm-places-option'))
+        .find((item) => item.textContent?.trim() === 'Restaurants')!.querySelector('input')!
+      await act(async () => restaurantOption.click())
+      await act(async () => { await vi.advanceTimersByTimeAsync(700) })
+      await act(async () => button(container, 'Orte laden').click())
+      await act(async () => { await vi.advanceTimersByTimeAsync(1100) })
+
+      let marker: L.Marker | undefined
+      map.eachLayer((layer: L.Layer) => {
+        if (layer instanceof L.Marker && layer.getElement()?.classList.contains('osm-place-marker-wrapper')) marker = layer
+      })
+      expect(marker).toBeDefined()
+      await act(async () => marker!.fire('click', { originalEvent: new MouseEvent('click') }))
+      const createButton = Array.from(document.querySelectorAll<HTMLButtonElement>('button'))
+        .find((item) => item.textContent?.trim() === 'Einen POI erstellen')!
+      await act(async () => createButton.click())
+
+      const editor = document.querySelector<HTMLElement>('[aria-label="Neuen POI anlegen"]')!
+      expect(editor.querySelector<HTMLInputElement>('[aria-label="POI-Titel"]')?.value).toBe('Waldschänke')
+      expect(editor.querySelector<HTMLTextAreaElement>('[aria-label="POI-Beschreibung"]')?.value).toBe('Kleine Gaststätte')
+      expect(editor.querySelector('.poi-icon-picker-current')?.textContent).toContain('Restaurant')
+      expect(editor.querySelector('[aria-label="POI-Breitengrad"]')).toBeNull()
+      expect(editor.querySelector('[aria-label="POI-Längengrad"]')).toBeNull()
+      expect(editor.textContent).not.toContain('OpenStreetMap')
+      expect(container.querySelectorAll('.point-marker')).toHaveLength(0)
+
+      await changeText(editor.querySelector<HTMLInputElement>('[aria-label="POI-Titel"]')!, 'Entwurf behalten')
+      await act(async () => marker!.fire('click', { originalEvent: new MouseEvent('click') }))
+      vi.spyOn(window, 'confirm').mockReturnValue(false)
+      const replaceButton = Array.from(document.querySelectorAll<HTMLButtonElement>('button'))
+        .find((item) => item.textContent?.trim() === 'Einen POI erstellen')!
+      await act(async () => replaceButton.click())
+      expect(document.querySelector<HTMLInputElement>('[aria-label="POI-Titel"]')?.value).toBe('Entwurf behalten')
+      await act(async () => button(document, 'Ortsdetails schließen').click())
+      await act(async () => button(document, 'POI-Eigenschaften verwerfen und schließen').click())
+      expect(container.querySelectorAll('.point-marker')).toHaveLength(0)
+
+      let currentMarker: L.Marker | undefined
+      map.eachLayer((layer: L.Layer) => {
+        if (layer instanceof L.Marker && layer.getElement()?.classList.contains('osm-place-marker-wrapper')) currentMarker = layer
+      })
+      await act(async () => currentMarker!.fire('click', { originalEvent: new MouseEvent('click') }))
+      const secondCreateButton = Array.from(document.querySelectorAll<HTMLButtonElement>('button'))
+        .find((item) => item.textContent?.trim() === 'Einen POI erstellen')!
+      await act(async () => secondCreateButton.click())
+      await changeText(document.querySelector<HTMLInputElement>('[aria-label="POI-Titel"]')!, 'Rastplatz')
+      await act(async () => button(document, 'POI-Eigenschaften übernehmen').click())
+      expect(container.querySelectorAll('.point-marker')).toHaveLength(1)
+      expect(container.querySelector('.point-marker-label')?.textContent).toBe('Rastplatz')
+      let savedMarker: L.Marker | undefined
+      map.eachLayer((layer: L.Layer) => {
+        if (layer instanceof L.Marker && layer.getElement()?.classList.contains('point-marker-wrapper')) savedMarker = layer
+      })
+      expect(savedMarker?.getLatLng().lat).toBe(placePosition.latitude)
+      expect(savedMarker?.getLatLng().lng).toBe(placePosition.longitude)
+      await act(async () => savedMarker!.fire('click', { originalEvent: new MouseEvent('click') }))
+      expect(document.querySelector('[aria-label="POI Rastplatz bearbeiten"]')).not.toBeNull()
+      const savedEditor = document.querySelector<HTMLElement>('[aria-label="POI Rastplatz bearbeiten"]')!
+      expect(savedEditor.querySelector('[aria-label="POI-Breitengrad"]')).toBeNull()
+      expect(savedEditor.querySelector('[aria-label="POI-Längengrad"]')).toBeNull()
+      expect(savedEditor.textContent).not.toContain('OpenStreetMap')
     } finally {
       await act(async () => root.unmount())
       container.remove()

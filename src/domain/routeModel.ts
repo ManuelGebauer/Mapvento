@@ -47,6 +47,10 @@ export type MapPoint = {
   source: 'manual' | 'poi'
   editable?: boolean
   icon?: PoiIconId
+  osmReference?: {
+    type: 'node' | 'way' | 'relation'
+    id: number
+  }
 }
 
 export type ProjectFile = {

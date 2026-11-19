@@ -172,6 +172,17 @@ function point(value: unknown, path: string): MapPoint {
     if (!isPoiIconId(item)) return invalid(itemPath, 'enthält ein unbekanntes POI-Symbol.')
     return item
   })
+  const osmReference = optional(data.osmReference, `${path}.osmReference`, (item, itemPath) => {
+    const reference = object(item, itemPath)
+    const osmId = number(reference.id, `${itemPath}.id`)
+    if (!Number.isSafeInteger(osmId) || osmId <= 0) {
+      return invalid(`${itemPath}.id`, 'muss eine positive sichere Ganzzahl sein.')
+    }
+    return {
+      type: oneOf(reference.type, ['node', 'way', 'relation'], `${itemPath}.type`),
+      id: osmId,
+    }
+  })
   return {
     id: id(data.id, `${path}.id`),
     name: string(data.name, `${path}.name`),
@@ -180,6 +191,7 @@ function point(value: unknown, path: string): MapPoint {
     source: oneOf(data.source, ['manual', 'poi'], `${path}.source`),
     editable: optional(data.editable, `${path}.editable`, boolean),
     icon,
+    ...(osmReference ? { osmReference } : {}),
   }
 }
 

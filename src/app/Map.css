@@ -417,6 +417,30 @@
   font-size: 11px;
 }
 
+.osm-place-details-links {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  font-size: 11px;
+}
+
+.osm-place-details-links button {
+  padding: 2px 6px;
+  border: 1px solid rgba(38, 52, 59, 0.2);
+  border-radius: 4px;
+  color: #315a44;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+}
+
+.osm-place-details-links button:hover,
+.osm-place-details-links button:focus-visible {
+  color: #10251a;
+  background: rgba(194, 245, 198, 0.96);
+}
+
 .osm-place-details-content {
   min-height: 0;
   padding: 5px 10px 8px;

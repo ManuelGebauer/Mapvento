@@ -9,6 +9,7 @@ import { isTauri } from '@tauri-apps/api/core'
 import { version } from '../../../package.json'
 import { formatAppVersion } from '../../integrations/desktop/appVersion'
 import type { PlacesDiagnostic } from '../../features/osm-places/placesDiagnostics'
+import type { Place } from '../../features/osm-places/places'
 import { getPoiIcon, poiIconSvg } from '../../integrations/map/poiIcons'
 import { OsmPlaceDetails } from './OsmPlaceDetails'
 
@@ -46,7 +47,11 @@ function describeDiagnostic(event: PlacesDiagnostic): string {
   ].filter(Boolean).join(', ')
 }
 
-export function PlacesControl({ places, disabled }: { places: PlacesControlState; disabled: boolean }) {
+export function PlacesControl({ places, disabled, onCreatePoi }: {
+  places: PlacesControlState
+  disabled: boolean
+  onCreatePoi: (place: Place, clientX: number, clientY: number) => boolean
+}) {
   const [open, setOpen] = useState(false)
   const [diagnosticMessage, setDiagnosticMessage] = useState('')
   const root = useRef<HTMLDivElement>(null)
@@ -179,6 +184,6 @@ export function PlacesControl({ places, disabled }: { places: PlacesControlState
         </p>
       </div>
     </section>}
-    <OsmPlaceDetails selection={places.selectedPlace} onClose={places.closePlaceDetails} />
+    <OsmPlaceDetails selection={places.selectedPlace} onClose={places.closePlaceDetails} onCreatePoi={onCreatePoi} />
   </div>
 }
