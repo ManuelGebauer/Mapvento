@@ -360,8 +360,18 @@ describe('settings and units', () => {
     try {
       await act(async () => root.render(<App />))
       expect(await screenText()).toContain('Software-Update')
-      expect(document.body.textContent).toContain('Gestartete Version')
-      expect(document.body.textContent).toContain('Verfügbare Version 99.0.0')
+      // expect(document.body.textContent).toContain('Gestartete Version')
+      // expect(document.body.textContent).toContain('Verfügbare Version 99.0.0')
+      const dialog = document.querySelector<HTMLElement>('[role="dialog"]')
+      expect(dialog?.getAttribute('aria-modal')).toBe('true')
+      const titleId = dialog?.getAttribute('aria-labelledby')
+      expect(document.getElementById(titleId ?? '')?.textContent).toBe('Software-Update')
+      expect(Array.from(dialog?.querySelectorAll('.version-info span') ?? [], (item) => item.textContent)).toEqual([
+        'Gestartete Version',
+        expect.stringMatching(/\S/),
+        'Verfügbare Version',
+        '99.0.0',
+      ])
       await click(button(document, 'Zum Download'))
       expect(open).toHaveBeenCalledWith(
         'https://github.com/decaritat/Mapvento/releases/latest',
