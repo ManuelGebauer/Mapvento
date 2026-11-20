@@ -36,6 +36,22 @@ OSM places are mutually exclusive toolbar panels. Escape or each panel's close
 button returns focus to its trigger, while clicking elsewhere closes the panel
 without moving focus away from the clicked control.
 
+### Action styles
+
+Shared semantic color tokens in `src/app/base.css` and action styles in
+`src/app/actions.css` define the interface hierarchy: green-filled primary
+actions apply or advance, neutral secondary actions cancel or close, and
+red-accented danger actions discard or delete. Text-labelled action buttons
+do not include redundant symbols. Icon actions use the same
+hover, pressed, disabled and visible-focus conventions. On light map panels,
+separate surface, text, border and focus tokens keep controls legible without
+changing map content or provider attribution. Disabled actions are subdued;
+read-only values remain readable.
+
+Comparable editors place destructive actions separately on the left, followed
+by cancel and then the primary action; confirmation dialogs use the same order.
+The map and route-color content retains its own domain-specific colors.
+
 ### Keyboard focus check
 
 The interface declares German as its document language and identifies the
