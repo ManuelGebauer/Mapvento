@@ -30,6 +30,31 @@ does not close it or discard its draft; use its actions to apply or cancel.
 Escape also closes the place search and cancels an in-progress waypoint drag
 or route-line drag without changing the route.
 
+### Text readability
+
+The interface uses scalable text for route metadata, editor labels, status
+messages and elevation axes. At 200% text size, long panels and editors can
+scroll, and the elevation profile reflows below the route metrics.
+
+Representative WCAG contrast checks (foreground against the effective
+background, including transparency) are maintained in
+`tests/textContrast.test.ts`:
+
+| Context | Minimum measured ratio |
+| --- | ---: |
+| Secondary text on dark panel / raised / soft surfaces | 5.50:1 |
+| Secondary text on hover / focus surfaces | 5.50:1 |
+| Error text on hover | 6.26:1 |
+| Profile selection over the green chart | 6.67:1 |
+| Search placeholder on white | 6.26:1 |
+| Map attribution over a black map | 7.35:1 |
+| Map notice over a white map | 12.42:1 |
+
+Disabled action controls are intentionally subdued and are excluded from
+the text contrast requirement; read-only field values remain readable.
+Colors and labels baked into external map tiles are controlled by their
+providers and are outside these checks.
+
 Visited map tiles are cached locally. Full offline maps are not currently
 available.
 
