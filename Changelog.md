@@ -10,15 +10,18 @@ once released versions are maintained.
 
 ### Added
 
-- Optional show OpenStreetMap places (customer-accessible) with automatic
+- Show OpenStreetMap places (customer-accessible) with automatic
   bounded viewport loading and 14-day cache; using Dresel Overpass and
-  Private.coffee as fallback. Selectable types include bakeries, butchers and
-  supermarkets with convenience, variety, general and food shops. Disused,
-  abandoned and permanently closed places are excluded.
+  Private.coffee as fallback.
 - Show details of OpenStreetMap places in a popup window and provide quick
   acces to linked images and weblinks.
 - OSM place details can prepare an editable POI draft with its OSM name when
   available (otherwise blank), description, icon, coordinates and OSM reference.
+- Check for newer GitHub releases at startup and offer the latest download.
+
+### Changed
+
+- Start every launch with a new, empty project instead of restoring the last one.
 
 ## [0.1.0] - 2026-11-12
 

@@ -1,0 +1,46 @@
+.update-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1500;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(5, 9, 12, 0.6);
+}
+
+.update-dialog {
+  width: min(420px, 100%);
+  padding: 22px;
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  background: var(--panel);
+  box-shadow: var(--shadow);
+  outline: none;
+}
+
+.update-dialog .version-info {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  column-gap: 20px;
+  row-gap: 6px;
+  margin-top: 12px;
+  font-size: 0.9rem;
+}
+
+.update-dialog .version-info span:nth-child(even) {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.update-dialog h2 { margin: 0 0 16px; }
+.update-dialog p { margin: 8px 0; line-height: 1.5; }
+.update-dialog footer { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
+.update-dialog button {
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  padding: 7px 10px;
+  background: var(--panel);
+  color: inherit;
+  cursor: pointer;
+}
+.update-dialog .update-download { border-color: var(--green); background: var(--green); color: var(--panel); }

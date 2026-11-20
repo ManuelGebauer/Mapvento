@@ -12,7 +12,7 @@ export function SettingsDialog({ settings, getMapView, onSave, onClose }: {
   onSave: (settings: Settings) => string | null
   onClose: () => void
 }) {
-  const [category, setCategory] = useState<'start' | 'units' | 'developer'>('start')
+  const [category, setCategory] = useState<'general' | 'start' | 'units' | 'developer'>('general')
   const [draft, setDraft] = useState(settings)
   const [latitude, setLatitude] = useState(String(settings.start.latitude))
   const [longitude, setLongitude] = useState(String(settings.start.longitude))
@@ -64,12 +64,27 @@ export function SettingsDialog({ settings, getMapView, onSave, onClose }: {
         <form onSubmit={save}>
           <div className="settings-body">
             <nav aria-label="Einstellungskategorien">
+              <button type="button" aria-current={category === 'general' ? 'page' : undefined} onClick={() => setCategory('general')}>Allgemein</button>
               <button type="button" aria-current={category === 'start' ? 'page' : undefined} onClick={() => setCategory('start')}>Start</button>
               <button type="button" aria-current={category === 'units' ? 'page' : undefined} onClick={() => setCategory('units')}>Einheiten</button>
               <button type="button" aria-current={category === 'developer' ? 'page' : undefined} onClick={() => setCategory('developer')}>Entwicklung</button>
             </nav>
             <section className="settings-fields">
-              {category === 'start' ? <>
+              {category === 'general' ? <>
+                <h3>Allgemein</h3>
+                <p>Allgemeine Einstellungen für Mapvento.</p>
+                <label className="settings-checkbox">
+                  <input
+                    type="checkbox"
+                    checked={draft.general.checkForUpdates}
+                    onChange={(event) => setDraft({
+                      ...draft,
+                      general: { ...draft.general, checkForUpdates: event.target.checked },
+                    })}
+                  />
+                  Beim Programmstart nach Updates suchen
+                </label>
+              </> : category === 'start' ? <>
                 <h3>Start</h3>
                 <p>Diese Kartenansicht und Layer werden beim nächsten Programmstart verwendet.</p>
                 <label>Basiskarte<select value={draft.start.layerId} onChange={(event) => setDraft({ ...draft, start: { ...draft.start, layerId: event.target.value } })}>
@@ -130,7 +145,8 @@ export function SettingsDialog({ settings, getMapView, onSave, onClose }: {
                 <button type="button" onClick={() => {
                   if (category === 'start') { setDraft({ ...draft, start: DEFAULT_SETTINGS.start }); setView(DEFAULT_SETTINGS.start) }
                   else if (category === 'units') setDraft({ ...draft, units: DEFAULT_SETTINGS.units })
-                  else setDraft({ ...draft, developer: DEFAULT_SETTINGS.developer })
+                  else if (category === 'developer') setDraft({ ...draft, developer: DEFAULT_SETTINGS.developer })
+                  else setDraft({ ...draft, general: DEFAULT_SETTINGS.general })
                   setError('')
                 }}>Standardeinstellungen wiederherstellen</button>
               </div>

@@ -28,6 +28,31 @@ describe('new project', () => {
     vi.unstubAllGlobals()
   })
 
+  it('starts with the standard empty project instead of restoring the last project', async () => {
+    vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
+    const savedProject = {
+      ...initialProject,
+      name: 'Letztes Projekt',
+      routes: [{
+        ...initialProject.routes[0],
+        nodes: [{ id: 'one', coordinate: [13, 52] }, { id: 'two', coordinate: [14, 53] }],
+      }],
+    }
+    localStorage.setItem('mapvento-project', JSON.stringify(savedProject))
+    const container = document.createElement('div')
+    document.body.append(container)
+    const root = createRoot(container)
+    try {
+      await act(async () => root.render(<App />))
+      expect(container.querySelector('[aria-label="Projektname"]')?.textContent).toBe(initialProject.name)
+      expect(container.querySelectorAll('.route-node')).toHaveLength(0)
+      expect(localStorage.getItem('mapvento-project')).toBe(JSON.stringify(savedProject))
+    } finally {
+      await act(async () => root.unmount())
+      container.remove()
+    }
+  })
+
   it('creates a default project without prompting when unchanged, and discards changes on No', async () => {
     vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
     const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)

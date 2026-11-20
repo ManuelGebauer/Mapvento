@@ -20,10 +20,13 @@ import { PointEditor } from '../components/points/PointEditor'
 import { MapToolbar } from '../components/map/MapToolbar'
 import { ElevationProfile } from '../components/elevation-profile/ElevationProfile'
 import { SettingsDialog } from '../components/settings/SettingsDialog'
+import { UpdateDialog } from '../components/update/UpdateDialog'
 import { ExitDialog } from '../components/exit/ExitDialog'
 import { distanceInUnit, readSettings, SETTINGS_KEY, type Settings } from '../domain/settings'
 import { tileDiagnostics } from '../integrations/map/tileDiagnostics'
 import { openExternalUrl } from '../integrations/desktop/externalUrl'
+import { getAppVersion } from '../integrations/desktop/appVersion'
+import { checkForUpdate, type AvailableUpdate } from '../features/update-check/updateCheck'
 import { ROUTING_PROVIDER } from '../domain/routing'
 import {
   type Coordinate,
@@ -39,7 +42,7 @@ import {
   DISTANCE_MARKER_MAX_STEP_KM,
   DISTANCE_MARKER_MIN_STEP_KM,
 } from '../domain/routeMetrics'
-import { readInitialProject } from '../domain/project'
+import { initialProject } from '../domain/project'
 import { useLeafletMap } from '../integrations/map/useLeafletMap'
 import { useProjectFiles } from '../features/project-files/useProjectFiles'
 import { uid } from '../domain/uid'
@@ -88,18 +91,17 @@ function StatusBanner({
 
 function App() {
   const [initial] = useState(() => {
-    let warning = ''
-    const project = readInitialProject(localStorage, (message) => { warning = message })
     const stored = readSettings(localStorage)
     return {
-      project: stored.saved ? { ...project, mapLayerId: stored.settings.start.layerId, mapOverlayIds: stored.settings.start.overlayIds } : project,
+      project: stored.saved ? { ...initialProject, mapLayerId: stored.settings.start.layerId, mapOverlayIds: stored.settings.start.overlayIds } : initialProject,
       settings: stored.settings,
-      warning: [warning, stored.warning].filter(Boolean).join(' '),
+      warning: stored.warning,
     }
   })
   const [project, setProject] = useState<ProjectFile>(initial.project)
   const [settings, setSettings] = useState(initial.settings)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [availableUpdate, setAvailableUpdate] = useState<AvailableUpdate | null>(null)
   const [editingProjectName, setEditingProjectName] = useState(false)
   const [projectNameDraft, setProjectNameDraft] = useState('')
   const [projectDescriptionDraft, setProjectDescriptionDraft] = useState('')
@@ -156,6 +158,18 @@ function App() {
     textarea.style.height = 'auto'
     textarea.style.height = `${Math.min(textarea.scrollHeight, 80)}px`
   }, [editingProjectName, projectDescriptionDraft, project.description])
+
+  useEffect(() => {
+    if (!initial.settings.general.checkForUpdates) return
+    const controller = new AbortController()
+    void getAppVersion()
+      .then((currentVersion) => checkForUpdate(currentVersion, controller.signal))
+      .then((update) => { if (update && !controller.signal.aborted) setAvailableUpdate(update) })
+      .catch((error: unknown) => {
+        if (!controller.signal.aborted) console.warn('Nach Updates konnte nicht gesucht werden.', error)
+      })
+    return () => controller.abort()
+  }, [initial.settings.general.checkForUpdates])
 
   useEffect(() => {
     if (openRouteMenu) {
@@ -739,7 +753,7 @@ function App() {
       />
       <div
         className="app-shell"
-        inert={routePropertiesOpen || aboutOpen || cacheOpen || settingsOpen || routeCreationDialogOpen || exitDialogOpen}
+        inert={routePropertiesOpen || aboutOpen || cacheOpen || settingsOpen || routeCreationDialogOpen || exitDialogOpen || Boolean(availableUpdate)}
         onClick={() => contextMenu && setContextMenu(null)}
       >
 
@@ -967,6 +981,11 @@ function App() {
       </main>
       {aboutOpen && <AboutDialog onClose={() => setAboutOpen(false)} />}
       {settingsOpen && <SettingsDialog settings={settings} getMapView={getMapView} onSave={saveSettings} onClose={() => setSettingsOpen(false)} />}
+      {availableUpdate && <UpdateDialog
+        currentVersion={availableUpdate.currentVersion}
+        availableVersion={availableUpdate.availableVersion}
+        onClose={() => setAvailableUpdate(null)}
+      />}
       {cacheOpen && <CacheDialog onClose={() => setCacheOpen(false)}
         layerIds={[layerId, ...(project.mapOverlayIds ?? [])]} retry={retryMapLayer}
         project={project} mapZoom={mapZoom}

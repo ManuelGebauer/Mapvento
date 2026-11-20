@@ -8,6 +8,7 @@ import { DEFAULT_SETTINGS, distanceInUnit, durationInUnit, elevationInUnit, pars
 import { profileDetailsAtIndex, routeMetrics } from '../src/domain/routeMetrics'
 import { RouteEditor } from '../src/components/routes/RouteEditor'
 import { tileDiagnostics } from '../src/integrations/map/tileDiagnostics'
+import { importStoredProject } from './projectTestHelpers'
 
 function button(root: ParentNode, text: string) {
   const found = Array.from(root.querySelectorAll<HTMLButtonElement>('button')).find((item) => item.textContent?.trim() === text)
@@ -55,6 +56,8 @@ describe('settings and units', () => {
     const oldSettings = { version: 1, start: DEFAULT_SETTINGS.start, units: DEFAULT_SETTINGS.units }
     expect(parseSettings(oldSettings).developer.cacheDiagnostics).toBe(false)
     expect(parseSettings(oldSettings).developer.placesDiagnostics).toBe(false)
+    expect(parseSettings(oldSettings).general.checkForUpdates).toBe(DEFAULT_SETTINGS.general.checkForUpdates)
+    expect(DEFAULT_SETTINGS.general.checkForUpdates).toBe(!import.meta.env.DEV)
     expect(() => parseSettings({ ...DEFAULT_SETTINGS, start: { ...DEFAULT_SETTINGS.start, latitude: 90 } })).toThrow()
     expect(() => parseSettings({ ...DEFAULT_SETTINGS, start: { ...DEFAULT_SETTINGS.start, overlayIds: ['invalid'] } })).toThrow()
     expect(() => parseSettings({ ...DEFAULT_SETTINGS, units: { ...DEFAULT_SETTINGS.units, distance: 'invalid' } })).toThrow()
@@ -62,6 +65,7 @@ describe('settings and units', () => {
     expect(() => parseSettings({ ...DEFAULT_SETTINGS, units: { ...DEFAULT_SETTINGS.units, duration: 'invalid' } })).toThrow()
     expect(() => parseSettings({ ...DEFAULT_SETTINGS, developer: { cacheDiagnostics: 'yes' } })).toThrow()
     expect(() => parseSettings({ ...DEFAULT_SETTINGS, developer: { placesDiagnostics: 'yes' } })).toThrow()
+    expect(() => parseSettings({ ...DEFAULT_SETTINGS, general: { checkForUpdates: 'yes' } })).toThrow()
     const warning = vi.spyOn(console, 'warn').mockImplementation(() => {})
     localStorage.setItem(SETTINGS_KEY, '{bad')
     expect(readSettings(localStorage)).toMatchObject({ settings: DEFAULT_SETTINGS, saved: false })
@@ -106,7 +110,9 @@ describe('settings and units', () => {
     const root = createRoot(container)
     try {
       await act(async () => root.render(<App />))
+      await importStoredProject(container)
       await openSettings(container)
+      await click(button(document, 'Start'))
       const position = document.querySelector<HTMLElement>('[aria-labelledby="settings-position-title"]')!
       expect(position.textContent).toContain('Kartenposition beim Start')
       expect(position.querySelectorAll('input')).toHaveLength(3)
@@ -143,6 +149,7 @@ describe('settings and units', () => {
       expect(container.querySelector('.profile-selection')?.textContent).toContain(`${distanceInUnit(metrics.length, 'mi').toFixed(2)} mi ab Start`)
       expect(container.querySelector('.profile-selection')?.textContent).toContain('90 min ab Start')
       await openSettings(container)
+      await click(button(document, 'Start'))
       await input('Breitengrad', '50')
       await click(button(document, 'Einheiten'))
       await click(button(document, 'Standardeinstellungen wiederherstellen'))
@@ -167,6 +174,7 @@ describe('settings and units', () => {
     let root = createRoot(container)
     try {
       await act(async () => root.render(<App />))
+      await importStoredProject(container)
       await openSettings(container)
       await click(button(document, 'Einheiten'))
       await select('Dauer', 'clock')
@@ -182,6 +190,7 @@ describe('settings and units', () => {
       await act(async () => root.unmount())
       root = createRoot(container)
       await act(async () => root.render(<App />))
+      await importStoredProject(container)
       expect(container.querySelector('.route-card-stats')?.textContent).toContain('6:42')
       expect(readSettings(localStorage).settings.units.duration).toBe('clock')
     } finally { await act(async () => root.unmount()); container.remove() }
@@ -198,6 +207,7 @@ describe('settings and units', () => {
       const map = mapSpy.mock.results[0].value as L.Map
       await act(async () => map.setView([48, 11], 9))
       await openSettings(container)
+      await click(button(document, 'Start'))
       await select('Basiskarte', 'opentopomap')
       const overlay = Array.from(document.querySelectorAll('label')).find((item) => item.textContent?.includes('Wanderwege'))!.querySelector('input')!
       await click(overlay)
@@ -220,6 +230,7 @@ describe('settings and units', () => {
       expect(container.querySelector('.leaflet-control-attribution')?.textContent).toContain('OpenTopoMap')
       expect(container.querySelector('.leaflet-control-attribution')?.textContent).toContain('Waymarked Trails')
       await openSettings(container)
+      await click(button(document, 'Start'))
       await click(button(document, 'Standardeinstellungen wiederherstellen'))
       await click(button(document, 'Übernehmen'))
       expect(JSON.parse(localStorage.getItem(SETTINGS_KEY)!).start).toEqual(DEFAULT_SETTINGS.start)
@@ -312,4 +323,68 @@ describe('settings and units', () => {
       expect(container.querySelector('[aria-label="Overpass-Diagnose"]')).not.toBeNull()
     } finally { await act(async () => root.unmount()); container.remove() }
   })
+
+  it('persists the startup update-check preference from Allgemein', async () => {
+    vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
+    const container = document.createElement('div')
+    document.body.append(container)
+    const root = createRoot(container)
+    try {
+      await act(async () => root.render(<App />))
+      await openSettings(container)
+      expect(document.querySelector('h3')?.textContent).toBe('Allgemein')
+      const checkbox = Array.from(document.querySelectorAll('label'))
+        .find((label) => label.textContent?.includes('Beim Programmstart nach Updates suchen'))
+        ?.querySelector<HTMLInputElement>('input')
+      expect(checkbox?.checked).toBe(DEFAULT_SETTINGS.general.checkForUpdates)
+      await click(checkbox!)
+      await click(button(document, 'Übernehmen'))
+      expect(readSettings(localStorage).settings.general.checkForUpdates).toBe(!DEFAULT_SETTINGS.general.checkForUpdates)
+    } finally { await act(async () => root.unmount()); container.remove() }
+  })
+
+  it('checks for a newer release on startup and opens the download from the update dialog', async () => {
+    vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify({
+      ...DEFAULT_SETTINGS,
+      general: { checkForUpdates: true },
+    }))
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ tag_name: 'v99.0.0' }),
+    }))
+    const open = vi.spyOn(window, 'open').mockImplementation(() => null)
+    const container = document.createElement('div')
+    document.body.append(container)
+    const root = createRoot(container)
+    try {
+      await act(async () => root.render(<App />))
+      expect(await screenText()).toContain('Software-Update')
+      // expect(document.body.textContent).toContain('Gestartete Version')
+      // expect(document.body.textContent).toContain('Verfügbare Version 99.0.0')
+      const dialog = document.querySelector<HTMLElement>('[role="dialog"]')
+      expect(dialog?.getAttribute('aria-modal')).toBe('true')
+      const titleId = dialog?.getAttribute('aria-labelledby')
+      expect(document.getElementById(titleId ?? '')?.textContent).toBe('Software-Update')
+      expect(Array.from(dialog?.querySelectorAll('.version-info span') ?? [], (item) => item.textContent)).toEqual([
+        'Gestartete Version',
+        expect.stringMatching(/\S/),
+        'Verfügbare Version',
+        '99.0.0',
+      ])
+      await click(button(document, 'Zum Download'))
+      expect(open).toHaveBeenCalledWith(
+        'https://github.com/decaritat/Mapvento/releases/latest',
+        '_blank',
+        'noopener,noreferrer',
+      )
+      await click(button(document, 'Schließen'))
+      expect(document.querySelector('[role="dialog"]')).toBeNull()
+    } finally { await act(async () => root.unmount()); container.remove() }
+  })
 })
+
+async function screenText() {
+  await act(async () => { await Promise.resolve(); await Promise.resolve() })
+  return document.body.textContent ?? ''
+}
