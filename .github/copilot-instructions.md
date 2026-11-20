@@ -68,7 +68,7 @@ Mapvento is a locally installable, cross-platform open-source application for cr
   [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format. Suitable
   categories are `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, and
   `Security`. Prefer short statements with a key message over long, detailed
-  sentences.When a release is published, assign the changes to a version with a
+  sentences. When a release is published, assign the changes to a version with a
   date; do not silently overwrite existing entries.
 
 ### Changelog management rules
