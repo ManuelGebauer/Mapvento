@@ -119,8 +119,15 @@ the text contrast requirement; read-only field values remain readable.
 Colors and labels baked into external map tiles are controlled by their
 providers and are outside these checks.
 
-Visited map tiles are cached locally. Full offline maps are not currently
-available.
+Visited map tiles and OSM places use separate local caches. Clearing either
+cache requires confirmation and does not affect the other; cleared data must
+be loaded again. Full offline maps are not currently available. Cache actions
+show their progress and outcome; the cache dialog remains open while a tile
+cache action is running.
+
+Project file and tile-cache problems remain visible until dismissed. OSM place
+cache errors remain available in the places panel for retry. Project success
+and cancellation notices disappear automatically.
 
 ## Platforms and requirements
 
