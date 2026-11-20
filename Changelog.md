@@ -8,6 +8,8 @@ once released versions are maintained.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-20
+
 ### Added
 
 - Show OpenStreetMap places (customer-accessible) with automatic
@@ -42,3 +44,11 @@ once released versions are maintained.
   provider and third-party license information.
 - Automated CI, dependency license checks, and release workflows for Linux and
   Windows.
+
+<!--
+Categories from Keep a Changelog:
+Added, Changed, Deprecated, Removed, Fixed, Security.
+
+Add new changes only under [Unreleased]. When a release is published, assign
+the changes to a version and add the release date.
+-->
