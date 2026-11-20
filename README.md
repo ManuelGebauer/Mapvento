@@ -24,6 +24,12 @@ inspect route points. Home and End select the endpoints; Escape clears the
 selection. The corresponding position is shown on the map. When elevation
 data is unavailable, the profile identifies its synthetic fallback values.
 
+Dialogs keep keyboard focus inside until closed. Escape cancels the current
+dialog, or closes an open POI icon picker first. Clicking outside a dialog
+does not close it or discard its draft; use its actions to apply or cancel.
+Escape also closes the place search and cancels an in-progress waypoint drag
+or route-line drag without changing the route.
+
 Visited map tiles are cached locally. Full offline maps are not currently
 available.
 
