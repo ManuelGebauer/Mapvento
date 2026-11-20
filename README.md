@@ -30,6 +30,29 @@ does not close it or discard its draft; use its actions to apply or cancel.
 Escape also closes the place search and cancels an in-progress waypoint drag
 or route-line drag without changing the route.
 
+### Keyboard focus check
+
+The interface declares German as its document language and identifies the
+English branding and read-only badges separately. Keyboard focus uses a visible
+outline on dark panels and a dark outline on light map controls; the map itself
+uses a two-tone outline.
+
+The following keyboard check was performed in headless Chrome at 1051 × 944
+pixels, with native Tab and Shift+Tab key events:
+
+- At normal text size, focus moved from the main menu through the project and
+  route controls, map and map tools, then the elevation profile controls.
+- In the route editor, focus moved through the description, provider link,
+  route type, color choices, distance-marker switch and actions, wrapping to
+  the name field. The same controls and reverse navigation were checked at
+  200% root text size.
+- In the POI editor, all 46 icon choices were traversed. Leaving the picker
+  closed its overlay, keeping the title field visible. Place-search actions
+  and attribution links were also checked.
+
+These are representative checks, not a full screen-reader or browser-zoom
+audit; editing routes on the map remains mouse-oriented.
+
 ### Text readability
 
 The interface uses scalable text for route metadata, editor labels, status
