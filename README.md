@@ -30,6 +30,12 @@ does not close it or discard its draft; use its actions to apply or cancel.
 Escape also closes the place search and cancels an in-progress waypoint drag
 or route-line drag without changing the route.
 
+The main menu and route action menus support Arrow Up/Down, Home and End;
+Escape closes them and returns focus to their trigger. Search, map layers and
+OSM places are mutually exclusive toolbar panels. Escape or each panel's close
+button returns focus to its trigger, while clicking elsewhere closes the panel
+without moving focus away from the clicked control.
+
 ### Keyboard focus check
 
 The interface declares German as its document language and identifies the
