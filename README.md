@@ -18,6 +18,12 @@ your device; map data is loaded online.
 - View OpenStreetMap places on the map by using Overpass API
 - Save projects locally and continue working on them later
 
+Expand the elevation profile with the arrow button or the mini chart. In the
+expanded profile, click a position or use the arrow keys to
+inspect route points. Home and End select the endpoints; Escape clears the
+selection. The corresponding position is shown on the map. When elevation
+data is unavailable, the profile identifies its synthetic fallback values.
+
 Visited map tiles are cached locally. Full offline maps are not currently
 available.
 
