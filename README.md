@@ -23,6 +23,9 @@ expanded profile, click a position or use the arrow keys to
 inspect route points. Home and End select the endpoints; Escape clears the
 selection. The corresponding position is shown on the map. When elevation
 data is unavailable, the profile identifies its synthetic fallback values.
+Route statistics show placeholders until at least two distinct points define a
+distance. Durations without usable timestamps are marked as estimates; when
+timestamps are available, duration is derived from them.
 
 Dialogs keep keyboard focus inside until closed. Escape cancels the current
 dialog, or closes an open POI icon picker first. Clicking outside a dialog
