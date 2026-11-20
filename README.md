@@ -52,6 +52,22 @@ Comparable editors place destructive actions separately on the left, followed
 by cancel and then the primary action; confirmation dialogs use the same order.
 The map and route-color content retains its own domain-specific colors.
 
+### Icons and route colors
+
+Icon-only controls have an accessible action name; close, cancel and delete
+remain distinct by their names and context. Text buttons do not carry icons.
+Map tools use a 20-unit SVG grid, rounded 1.6-unit strokes and a 17 px display
+size. POI choices use a 20 px icon area; original Carto viewBoxes and filled
+shapes remain intact, while custom POI drawings use a 24-unit grid with rounded
+1.8-unit strokes. POI IDs and attribution are unchanged. Active tools have a
+distinct background, selected POI choices have a shape marker as well as
+color, and keyboard focus has a separate outline.
+
+Route color presets have names and expose their selected state; a check mark
+and the current color name identify the selection without relying on color.
+The default is light green. The native custom color picker retains the last
+custom color even when a preset is selected.
+
 ### Keyboard focus check
 
 The interface declares German as its document language and identifies the
